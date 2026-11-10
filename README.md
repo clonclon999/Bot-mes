@@ -14,6 +14,50 @@ Bot này dùng **tài khoản Facebook cá nhân** (không phải Page) nên **v
 - Chỉ trả lời khi có dấu `!` để tránh spam nhóm
 - Chạy 24/7 trên Botkeep.cloud
 
+### 🎮 Trò chơi VNĐ ảo (giải trí, không dùng tiền thật)
+> ⚠️ Chỉ dùng VNĐ ảo trong bot để chơi vui với bạn bè. Không dùng để chơi cờ bạc thật (bất hợp pháp ở Việt Nam).
+
+- `!balance` - Xem số dư (người mới có sẵn 100.000 VNĐ)
+- `!daily` - Nhận 50.000 VNĐ mỗi ngày
+- `!diemdanh` - Điểm danh theo streak (30.000 + 5.000/ngày streak)
+- `!work` - Làm việc nhận 5.000-20.000 VNĐ (chờ 60 giây)
+- `!fish` - Đi câu cá (chờ 120 giây, trúng cá vàng ăn lớn)
+- `!farm` - Trồng cây thu hoạch (chờ 180 giây)
+- `!taixiu <tai|xiu|so> <cuoc>` - Tài Xỉu: `!taixiu tai 10000`, `!taixiu xiu 20000`, `!taixiu 11 10000` (đoán tổng = 11, ăn 1 ăn 5)
+- `!baucua <bau|cua|tom|ca|ga|nai> <cuoc>` - Bầu Cua Cá Tôm: `!baucua cua 10000` (trúng 1 con ăn 2x, 2 con ăn 3x, 3 con ăn 4x, kèm ảnh bàn Bầu Cua)
+- `!slot <cuoc>` - Quay xèng: `!slot 10000` (3 giống nhau ăn 10x, 2 giống nhau ăn 2x)
+- `!lotto <so 00-99> <cuoc>` - Xổ số: `!lotto 69 10000` (trúng ăn 50x)
+- `!lixi <tien>` - Thả lì xì, người khác gõ `!nhan` để nhận (hết hạn 60s). Gõ `!lixi` không kèm tiền thì bot lì xì miễn phí
+- `!quiz` - Đố vui có thưởng 20.000 VNĐ (trả lời đúng đầu tiên, không cần dấu !)
+- `!soicau` - Xem lịch sử 20 ván Tài Xỉu gần nhất + thống kê % Tài/Xỉu + cầu hiện tại (chỉ thống kê ván của bot, không dự đoán được kết quả thật)
+- `!bank <so tien> @ten` - Chuyển tiền cho người khác: `!bank 50000 @TenBan`
+- `!top` - Bảng xếp hạng đại gia trong nhóm
+- Tự động chào mừng khi có người mới vào nhóm / tạm biệt khi rời nhóm
+
+### 🛡️ Chức năng Admin (chỉ admin mới dùng được, gõ `!adminhelp`)
+
+**Cách làm admin KHÔNG cần gõ lệnh trong nhóm (khuyên dùng):**
+1. Trong nhóm, gõ `!id` → bot trả lời ID số của bạn (ví dụ: `1234567890123`)
+2. Vào Botkeep → tab **Environment** → thêm biến:
+   - **Key:** `ADMIN_IDS`
+   - **Value:** ID số vừa lấy (nhiều admin thì cách nhau bằng dấu phẩy: `id1,id2`)
+3. **Restart** server → bạn tự động là admin, không cần gõ `!addadmin` nữa
+
+> Link share Facebook không chứa ID số, nên phải dùng lệnh `!id` để lấy ID số nhé.
+- `!addadmin @ten` / `!deladmin @ten` / `!admins` - Thêm/xóa/xem danh sách admin (**chỉ admin mới dùng được**, admin đầu tiên phải thêm qua biến `ADMIN_IDS`)
+- `!kick @ten` - Kick khỏi nhóm (nếu bot là admin nhóm) + ban khỏi bot
+- `!ban @ten` / `!unban @ten` - Cấm bot / gỡ cấm
+- `!mute @ten <phút>` / `!unmute @ten` - Tắt tiếng tạm thời
+- `!warn @ten` - Cảnh cáo (3 lần = mute 10 phút)
+- `!give @ten <tiền>` - Tặng tiền, `!reset @ten` - Reset tiền về 100.000 VNĐ
+- `!stats` - Thống kê nhóm, `!settitle <tên>` - Đổi tên nhóm, `!color <màu>` - Đổi màu nhóm, `!emoji <emoji>` - Đổi emoji nhóm
+
+### Chống spam / đỡ bị Facebook quét + chạy nhẹ trên gói free Botkeep
+- Chỉ trả lời lệnh có dấu `!`, cooldown từng lệnh (3-180 giây), delay ngẫu nhiên 0.4-1s + typing indicator cho giống người
+- Không tự nhắn trước, không spam, giới hạn lịch sử Tài Xỉu 100 ván, không thêm thư viện nặng
+- Đăng nhập lỗi thì chờ 60s mới thoát (không thử login liên tục), dùng cookie APPSTATE thay vì email/password
+- Code nhẹ, 1 process duy nhất, RAM khoảng 100-200MB, chạy tốt trên gói free 512MB-2GB của Botkeep
+
 ---
 
 ## PHẦN 1: Chuẩn bị acc phụ

@@ -3,3 +3,4 @@ node_modules/
 appstate.json
 *.log
 fca-config.json
+data.json
