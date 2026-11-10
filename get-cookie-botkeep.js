@@ -15,6 +15,7 @@
  * CANH BAO: Khong share doan JSON nay cho ai! Ai co la dieu khien duoc acc.
  */
 
+require('dotenv').config(); // Botkeep ghi bien moi truong vao file .env, phai load file nay
 const fs = require('fs');
 
 const email = process.env.FB_EMAIL;

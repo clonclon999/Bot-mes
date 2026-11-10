@@ -15,6 +15,7 @@
  *  !info          - Thong tin bot
  */
 
+require('dotenv').config(); // Botkeep ghi bien moi truong vao file .env, phai load file nay
 const fs = require('fs');
 const path = require('path');
 const express = require('express');

@@ -11,6 +11,7 @@
  * CANH BAO: Khong bao gio share file appstate.json / cookie cho ai!
  */
 
+require('dotenv').config();
 const fs = require('fs');
 const readline = require('readline');
 
