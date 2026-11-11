@@ -165,3 +165,8 @@ Bạn chỉ cần điện thoại + Botkeep là đủ, không cần PC:
 - ✅ Cookie hết hạn thì lấy lại, đừng cố login bằng mật khẩu liên tục (dễ khóa acc)
 
 Chúc bạn thành công! 🚀
+
+
+## Xử lý đăng nhập bị treo
+
+Bản hiện tại dùng `@vangbanlanhat/fca-unofficial` và yêu cầu Node.js 22. Nếu đăng nhập không phản hồi sau 90 giây, bot tự thoát để tránh chiếm CPU vô hạn. Không Restart liên tục; kiểm tra APPSTATE/checkpoint trước.

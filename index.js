@@ -1130,7 +1130,7 @@ function handleCommand(api, event) {
 async function main() {
   let login;
   try {
-    login = require('@dongdev/fca-unofficial');
+    login = require('@vangbanlanhat/fca-unofficial');
   } catch (e) {
     console.error('❌ Chua cai thu vien. Hay chay npm install truoc.');
     process.exit(1);
@@ -1138,7 +1138,18 @@ async function main() {
 
   const credentials = getCredentials();
 
+  console.log('⏳ Dang ket noi Facebook (toi da 90 giay)...');
+  let loginFinished = false;
+  const loginTimeout = setTimeout(() => {
+    if (loginFinished) return;
+    console.error('❌ Dang nhap bi treo qua 90 giay. Bot se dung de tranh ton CPU va dang nhap lap lai.');
+    console.error('💡 APPSTATE co the het han/checkpoint, hoac Facebook chan IP may chu. Khong Restart lien tuc.');
+    process.exit(1);
+  }, 90000);
+
   login(credentials, (err, api) => {
+    loginFinished = true;
+    clearTimeout(loginTimeout);
     if (err) {
       console.error('❌ Dang nhap that bai:', err.message || err);
       console.error('💡 Meo: Cookie het han? Hay lay lai APPSTATE moi. Acc bi checkpoint? Hay doi acc phu khac.');
