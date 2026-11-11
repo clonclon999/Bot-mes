@@ -61,11 +61,24 @@ function getCredentials() {
   // Cach 1: APPSTATE tu bien moi truong (khuyen dung tren Botkeep)
   if (process.env.APPSTATE) {
     try {
-      const parsed = JSON.parse(process.env.APPSTATE);
-      console.log('🔑 Dang nhap bang APPSTATE (env)');
+      let raw = String(process.env.APPSTATE).trim();
+      // Fix loi hay gap: Botkeep ghi .env lam hong JSON nhieu dong / co \n \t
+      raw = raw.replace(/\\n/g, ' ').replace(/\\t/g, ' ').replace(/\\r/g, ' ');
+      // Neu JSON bi escape qua (\" thay vi "), sua lai
+      if (raw.includes('\\"')) raw = raw.replace(/\\"/g, '"');
+      // Chi lay phan tu [ dau tien den ] cuoi cung (bo chu thua o ngoai)
+      const startIdx = raw.indexOf('[');
+      const endIdx = raw.lastIndexOf(']');
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        raw = raw.slice(startIdx, endIdx + 1);
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error('APPSTATE phai la mang JSON, khong rong');
+      console.log(`🔑 Dang nhap bang APPSTATE (env) - ${parsed.length} cookies`);
       return { appState: parsed };
     } catch (e) {
       console.error('❌ APPSTATE khong phai JSON hop le:', e.message);
+      console.error('💡 Hay dan APPSTATE dang 1 dong duy nhat (compact JSON), bat dau bang [ va ket thuc bang ], dung dan nhieu dong.');
     }
   }
 
