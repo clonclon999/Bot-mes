@@ -1147,7 +1147,13 @@ async function main() {
     process.exit(1);
   }, 90000);
 
-  login(credentials, (err, api) => {
+  const loginOptions = {
+    forceLogin: true,
+    autoReconnect: false,
+    userAgent: process.env.FB_USER_AGENT || 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
+  };
+
+  login(credentials, loginOptions, (err, api) => {
     loginFinished = true;
     clearTimeout(loginTimeout);
     if (err) {
@@ -1177,6 +1183,7 @@ async function main() {
     api.listenMqtt((listenErr, event) => {
       if (listenErr) {
         console.error('❌ Loi listen:', listenErr.message || listenErr);
+        console.error('💡 Facebook tu choi MQTT. Hay kiem tra Thong bao Facebook > xac nhan dang nhap moi, roi lay lai APPSTATE.');
         return;
       }
       if (!event) return;
