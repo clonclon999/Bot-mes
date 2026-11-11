@@ -36,6 +36,8 @@ Bot này dùng **tài khoản Facebook cá nhân** (không phải Page) nên **v
 - `!rank` - Bảng xếp hạng cấp độ
 - `!quest` - Nhiệm vụ hàng ngày (3 nhiệm vụ/ngày, làm xong nhận tiền)
 - `!guess <so>` - Đoán số 1-100 (bot nghĩ số, bạn đoán, càng ít lần đoán càng nhiều tiền)
+- `!reaction` - Game phản xạ: bot đếm, ai gõ `!go` nhanh nhất được tiền
+- `!trieuphu` - Ai là triệu phú: trả lời 5 câu liên tiếp, đúng càng nhiều tiền càng lớn (tổng 210.000 VNĐ)
 - Tự động chào mừng khi có người mới vào nhóm / tạm biệt khi rời nhóm
 
 ### 🛡️ Chức năng Admin (chỉ admin mới dùng được, gõ `!adminhelp`)

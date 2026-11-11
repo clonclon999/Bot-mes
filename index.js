@@ -32,6 +32,8 @@
  *  !level / !rank - Xem cap do / xep hang cap do
  *  !quest         - Nhiem vu hang ngay
  *  !guess <so>    - Doan so 1-100
+ *  !reaction      - Game phan xa: ai go !go nhanh nhat duoc tien
+ *  !trieuphu      - Ai la trieu phu: tra loi 5 cau lien tiep
  *  --- ADMIN (chi admin moi dung duoc, go !adminhelp) ---
  *  !addadmin / !deladmin / !admins - Quan ly admin
  *  !kick / !ban / !unban / !mute / !unmute / !warn - Dieu hanh thanh vien
@@ -112,6 +114,32 @@ const cooldowns = {}; // senderID -> timestamp (chong spam)
 const activeLixi = {}; // threadID -> { amount, creatorID, expiresAt }
 const activeQuiz = {}; // threadID -> { question, answer, reward, expiresAt }
 const activeGuess = {}; // senderID -> { number, attempts }
+const activeReaction = {}; // threadID -> { state: 'waiting'|'go', goTime, reward }
+const activeTrieuphu = {}; // senderID -> { step, questions, earned }
+
+const TRIEUPHU_QUESTIONS = [
+  { q: 'Con gi keu meo meo?', a: 'meo' },
+  { q: 'Viet Nam thu do la gi?', a: 'ha noi' },
+  { q: '1 + 1 = ?', a: '2' },
+  { q: 'Con gi co 4 chan va sua moo moo?', a: 'bo' },
+  { q: 'Nuoc gi dai nhat the gioi?', a: 'nga' },
+  { q: 'Dong tien Viet Nam goi la gi?', a: 'dong' },
+  { q: 'Con gi an chuoi va leo cay?', a: 'khoi' },
+  { q: 'So lon nhat co 1 chu so la?', a: '9' },
+  { q: 'Con gi co mai cung va bo trong nuoc?', a: 'rua' },
+  { q: 'Mau gi la mau cua bao la Viet Nam?', a: 'do' },
+  { q: 'Con gi bay tren troi va keu o o?', a: 'ga' },
+  { q: 'Con gi song duoi nuoc va co 8 chan?', a: 'bach tuoc' },
+  { q: 'Mua gi la mua cua hoa mai?', a: 'tet' },
+  { q: 'Con gi keu u u va thich an co?', a: 'trau' },
+  { q: 'Ngay le Quoc khanh Viet Nam la ngay may?', a: '2/9' },
+  { q: 'Con gi leo cay va an chuoi dai?', a: 'khoi' },
+  { q: 'Hanh tinh gan mat nhat la?', a: 'sao kim' },
+  { q: 'Con so dau tien trong day so tu nhien la?', a: '0' },
+  { q: 'Con gi co 2 chan va biet bay?', a: 'chim' },
+  { q: 'Nuoc nao co thap Eiffel?', a: 'phap' },
+];
+const TRIEUPHU_REWARDS = [10000, 20000, 30000, 50000, 100000];
 const expCooldowns = {}; // senderID -> timestamp (chong farm EXP)
 
 const QUEST_POOL = [
@@ -306,7 +334,8 @@ function handleCommand(api, event) {
       '• !lixi <tien> - Tha lixi, nguoi khac go !nhan de nhan\n' +
       '• !quiz - Do vui co thuong (tra loi dung dau tien)\n' +
       '• !soicau - Xem lich su Tai/Xiu\n• !top - Dai gia nhat nhom\n' +
-      '• !level - Xem cap do cua ban\n• !rank - Xep hang cap do\n• !quest - Nhiem vu hang ngay\n• !guess <so> - Doan so 1-100\n\n' +
+      '• !level - Xem cap do cua ban\n• !rank - Xep hang cap do\n• !quest - Nhiem vu hang ngay\n• !guess <so> - Doan so 1-100\n' +
+      '• !reaction - Game phan xa, ai go !go nhanh nhat\n• !trieuphu - Ai la trieu phu 5 cau\n\n' +
       'Bot chi tra loi khi co dau ! de tranh spam nhom.\nAdmin go !adminhelp de xem lenh quan tri.');
     return;
   }
@@ -882,6 +911,90 @@ function handleCommand(api, event) {
     return;
   }
 
+  // ===== GAME PHAN XA =====
+  if (lower === '!reaction') {
+    if (activeReaction[threadID] && Date.now() < activeReaction[threadID].expiresAt) {
+      reply('Da co van phan xa dang cho, cho van nay xong nhe!');
+      return;
+    }
+    activeReaction[threadID] = { state: 'waiting', goTime: 0, expiresAt: Date.now() + 15000 };
+    reply('⚡ GAME PHAN XA!\nSan sang chua? Cho xiu...\nKhi thay chu GO thi go !go that nhanh!');
+    const waitMs = 3000 + Math.floor(Math.random() * 4000); // 3-7s
+    setTimeout(() => {
+      if (!activeReaction[threadID] || activeReaction[threadID].state !== 'waiting') return;
+      activeReaction[threadID].state = 'go';
+      activeReaction[threadID].goTime = Date.now();
+      activeReaction[threadID].expiresAt = Date.now() + 10000;
+      api.sendMessage('🚦 GO! Go !go nhanh len!', threadID);
+    }, waitMs);
+    return;
+  }
+  if (lower === '!go') {
+    const game = activeReaction[threadID];
+    if (!game) { reply('Chua co van phan xa nao. Go !reaction de bat dau!'); return; }
+    if (game.state === 'waiting') {
+      reply('⏳ Chua GO ma! Ban go qua nhanh, bi loai van nay!');
+      delete activeReaction[threadID];
+      return;
+    }
+    if (Date.now() > game.expiresAt) {
+      reply('Het han! Khong ai phan xa kip.');
+      delete activeReaction[threadID];
+      return;
+    }
+    const ms = Date.now() - game.goTime;
+    let reward = 5000;
+    if (ms < 1000) reward = 30000;
+    else if (ms < 2000) reward = 20000;
+    else if (ms < 3000) reward = 10000;
+    const u = getUser(senderID);
+    u.balance += reward;
+    addExp(u, 10);
+    saveData();
+    reply(`⚡ ${String(senderID).slice(-6)}... phan xa trong ${(ms / 1000).toFixed(2)}s! Nhan ${reward} VNĐ\n💰 So du: ${u.balance} VNĐ`);
+    delete activeReaction[threadID];
+    return;
+  }
+
+  // ===== AI LA TRIEU PHU =====
+  if (lower === '!trieuphu') {
+    if (activeTrieuphu[senderID]) {
+      const g = activeTrieuphu[senderID];
+      reply(`🎓 Ban dang choi Trieu Phu o cau ${g.step + 1}/5.\nCau hoi: ${g.questions[g.step].q}\nTra loi dung (go dap an, khong can dau !) de qua cau!`);
+      return;
+    }
+    const shuffled = [...TRIEUPHU_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 5);
+    activeTrieuphu[senderID] = { step: 0, questions: shuffled, earned: 0 };
+    reply(`🎓 AI LA TRIEU PHU!\nTra loi dung 5 cau lien tiep de nhan tong ${TRIEUPHU_REWARDS.reduce((a, b) => a + b, 0)} VNĐ!\n\nCau 1/5 (${TRIEUPHU_REWARDS[0]} VNĐ): ${shuffled[0].q}\nTra loi dung (go dap an) de qua cau!`);
+    return;
+  }
+  // Kiem tra tra loi Trieu Phu (tin nhan khong co dau !)
+  if (activeTrieuphu[senderID]) {
+    const g = activeTrieuphu[senderID];
+    const current = g.questions[g.step];
+    if (normalize(text) === normalize(current.a)) {
+      const reward = TRIEUPHU_REWARDS[g.step];
+      g.earned += reward;
+      const u = getUser(senderID);
+      u.balance += reward;
+      addExp(u, 10);
+      g.step += 1;
+      saveData();
+      if (g.step >= 5) {
+        reply(`🎉 CHUC MUNG BAN LA TRIEU PHU!\nBan da tra loi dung 5/5 cau!\nTong nhan: ${g.earned} VNĐ\n💰 So du: ${u.balance} VNĐ`);
+        delete activeTrieuphu[senderID];
+      } else {
+        reply(`✅ Dung roi! +${reward} VNĐ (tong da nhan: ${g.earned} VNĐ)\n\nCau ${g.step + 1}/5 (${TRIEUPHU_REWARDS[g.step]} VNĐ): ${g.questions[g.step].q}`);
+      }
+      return;
+    } else {
+      const u = getUser(senderID);
+      reply(`❌ Sai roi! Dap an la: ${current.a}\nBan dung o cau ${g.step + 1}/5, da nhan duoc ${g.earned} VNĐ. Go !trieuphu de choi lai!`);
+      delete activeTrieuphu[senderID];
+      return;
+    }
+  }
+
   // ===== TAI XIU =====
   if (lower.startsWith('!taixiu')) {
     const cd = checkCooldown(senderID, 3);
@@ -1078,7 +1191,8 @@ async function main() {
       // Xu ly lenh bat dau bang ! HOAC tra loi quiz dang cho
       const isCommand = event.body.trim().startsWith('!');
       const hasQuiz = activeQuiz[event.threadID] && Date.now() < activeQuiz[event.threadID].expiresAt;
-      if (isCommand || hasQuiz) {
+      const hasTrieuphu = activeTrieuphu[event.senderID];
+      if (isCommand || hasQuiz || hasTrieuphu) {
         handleCommand(api, event);
       }
     });
