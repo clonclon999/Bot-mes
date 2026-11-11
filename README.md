@@ -32,6 +32,10 @@ Bot này dùng **tài khoản Facebook cá nhân** (không phải Page) nên **v
 - `!soicau` - Xem lịch sử 20 ván Tài Xỉu gần nhất + thống kê % Tài/Xỉu + cầu hiện tại (chỉ thống kê ván của bot, không dự đoán được kết quả thật)
 - `!bank <so tien> @ten` - Chuyển tiền cho người khác: `!bank 50000 @TenBan`
 - `!top` - Bảng xếp hạng đại gia trong nhóm
+- `!level` - Xem cấp độ của bạn (chat + chơi game để lên cấp, lên cấp nhận tiền)
+- `!rank` - Bảng xếp hạng cấp độ
+- `!quest` - Nhiệm vụ hàng ngày (3 nhiệm vụ/ngày, làm xong nhận tiền)
+- `!guess <so>` - Đoán số 1-100 (bot nghĩ số, bạn đoán, càng ít lần đoán càng nhiều tiền)
 - Tự động chào mừng khi có người mới vào nhóm / tạm biệt khi rời nhóm
 
 ### 🛡️ Chức năng Admin (chỉ admin mới dùng được, gõ `!adminhelp`)

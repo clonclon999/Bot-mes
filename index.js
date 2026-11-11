@@ -29,6 +29,9 @@
  *  !quiz          - Do vui co thuong (tra loi dung dau tien duoc tien)
  *  !soicau        - Xem lich su + thong ke Tai/Xiu (chi thong ke, khong du doan duoc ket qua that)
  *  !top           - Bang xep hang dai gia
+ *  !level / !rank - Xem cap do / xep hang cap do
+ *  !quest         - Nhiem vu hang ngay
+ *  !guess <so>    - Doan so 1-100
  *  --- ADMIN (chi admin moi dung duoc, go !adminhelp) ---
  *  !addadmin / !deladmin / !admins - Quan ly admin
  *  !kick / !ban / !unban / !mute / !unmute / !warn - Dieu hanh thanh vien
@@ -108,6 +111,21 @@ let admins = []; // [senderID, ...] - admin cua bot
 const cooldowns = {}; // senderID -> timestamp (chong spam)
 const activeLixi = {}; // threadID -> { amount, creatorID, expiresAt }
 const activeQuiz = {}; // threadID -> { question, answer, reward, expiresAt }
+const activeGuess = {}; // senderID -> { number, attempts }
+const expCooldowns = {}; // senderID -> timestamp (chong farm EXP)
+
+const QUEST_POOL = [
+  { type: 'taixiu', desc: 'Choi 3 van Tai Xiu', target: 3, reward: 30000 },
+  { type: 'baucua', desc: 'Choi 2 van Bau Cua', target: 2, reward: 30000 },
+  { type: 'slot', desc: 'Quay xeng 2 lan', target: 2, reward: 25000 },
+  { type: 'fish', desc: 'Di cau ca 1 lan', target: 1, reward: 20000 },
+  { type: 'work', desc: 'Lam viec 2 lan', target: 2, reward: 25000 },
+  { type: 'bank', desc: 'Chuyen tien cho nguoi khac 1 lan', target: 1, reward: 20000 },
+  { type: 'win', desc: 'Thang 1 van bat ky', target: 1, reward: 30000 },
+  { type: 'quiz', desc: 'Tra loi dung 1 cau do vui', target: 1, reward: 25000 },
+  { type: 'lixi', desc: 'Nhan li xi 1 lan', target: 1, reward: 20000 },
+  { type: 'lotto', desc: 'Choi xo so 1 lan', target: 1, reward: 20000 },
+];
 
 const QUIZ_QUESTIONS = [
   { q: 'Con gi keu "meo meo"?', a: 'meo' },
@@ -164,7 +182,7 @@ if (process.env.ADMIN_IDS || process.env.ADMIN_ID) {
 
 function getUser(id) {
   if (!users[id]) {
-    users[id] = { balance: START_BALANCE, lastDaily: 0, lastWork: 0, wins: 0, losses: 0, lastCheckin: 0, streak: 0, banned: false, mutedUntil: 0, warns: 0 };
+    users[id] = { balance: START_BALANCE, lastDaily: 0, lastWork: 0, wins: 0, losses: 0, lastCheckin: 0, streak: 0, banned: false, mutedUntil: 0, warns: 0, exp: 0, level: 1, quests: null };
     saveData();
   }
   // migrate user cu thieu truong moi
@@ -173,9 +191,57 @@ function getUser(id) {
   if (users[id].banned === undefined) users[id].banned = false;
   if (users[id].mutedUntil === undefined) users[id].mutedUntil = 0;
   if (users[id].warns === undefined) users[id].warns = 0;
+  if (users[id].exp === undefined) users[id].exp = 0;
+  if (users[id].level === undefined) users[id].level = 1;
+  if (users[id].quests === undefined) users[id].quests = null;
   return users[id];
 }
 
+function addExp(user, amount) {
+  user.exp += amount;
+  let need = user.level * 100;
+  while (user.exp >= need) {
+    user.exp -= need;
+    user.level += 1;
+    const bonus = user.level * 10000;
+    user.balance += bonus;
+    need = user.level * 100;
+    // tra ve thong bao len cap qua reply o ngoai neu can, o day chi cong tien
+    user._levelUpBonus = (user._levelUpBonus || 0) + bonus;
+  }
+}
+function todayStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+}
+function getQuests(user) {
+  const today = todayStr();
+  if (!user.quests || user.quests.date !== today) {
+    // tao 3 nhiem vu ngau nhien moi ngay
+    const shuffled = [...QUEST_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
+    user.quests = {
+      date: today,
+      list: shuffled.map(q => ({ type: q.type, desc: q.desc, target: q.target, progress: 0, reward: q.reward, done: false }))
+    };
+    saveData();
+  }
+  return user.quests.list;
+}
+function addQuestProgress(user, type, amount = 1) {
+  const quests = getQuests(user);
+  let rewardMsg = '';
+  for (const q of quests) {
+    if (q.type === type && !q.done) {
+      q.progress += amount;
+      if (q.progress >= q.target) {
+        q.done = true;
+        user.balance += q.reward;
+        rewardMsg += `\n📜 Hoan thanh nhiem vu "${q.desc}"! +${q.reward} VNĐ`;
+      }
+    }
+  }
+  if (rewardMsg) saveData();
+  return rewardMsg;
+}
 function normalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
 }
@@ -239,7 +305,8 @@ function handleCommand(api, event) {
       '• !lotto <so 00-99> <cuoc> - Xo so, Vd: !lotto 69 10000\n' +
       '• !lixi <tien> - Tha lixi, nguoi khac go !nhan de nhan\n' +
       '• !quiz - Do vui co thuong (tra loi dung dau tien)\n' +
-      '• !soicau - Xem lich su Tai/Xiu\n• !top - Dai gia nhat nhom\n\n' +
+      '• !soicau - Xem lich su Tai/Xiu\n• !top - Dai gia nhat nhom\n' +
+      '• !level - Xem cap do cua ban\n• !rank - Xep hang cap do\n• !quest - Nhiem vu hang ngay\n• !guess <so> - Doan so 1-100\n\n' +
       'Bot chi tra loi khi co dau ! de tranh spam nhom.\nAdmin go !adminhelp de xem lenh quan tri.');
     return;
   }
@@ -300,6 +367,8 @@ function handleCommand(api, event) {
     if (cd > 0) { reply(`⏳ Cho ${cd}s nua moi lam viec duoc.`); return; }
     const earn = 5000 + Math.floor(Math.random() * 15001); // 5.000 - 20.000 VNĐ
     u.balance += earn;
+    addExp(u, 5);
+    let qmsg6 = addQuestProgress(u, 'work', 1);
     saveData();
     reply(`💼 Ban da lam viec va nhan duoc ${earn} VNĐ!\n💰 So du: ${u.balance} VNĐ`);
     return;
@@ -363,6 +432,8 @@ function handleCommand(api, event) {
     const receiver = getUser(recipientID);
     sender.balance -= amount;
     receiver.balance += amount;
+    addExp(sender, 5);
+    let qmsg7 = addQuestProgress(sender, 'bank', 1);
     saveData();
     reply(`💸 CHUYEN TIEN THANH CONG!\nTu: ${String(senderID).slice(-6)}...\nDen: ${recipientName || ('...' + String(recipientID).slice(-6))}\nSo tien: ${amount} VNĐ\n💰 So du cua ban: ${sender.balance} VNĐ`);
     return;
@@ -401,6 +472,8 @@ function handleCommand(api, event) {
     else if (r < 0.95) { earn = 20000 + Math.floor(Math.random() * 30001); msg += `🐠 Cau duoc ca to! +${earn} VNĐ`; }
     else { earn = 100000 + Math.floor(Math.random() * 100001); msg += `✨ CAU DUOC CA VANG! +${earn} VNĐ`; }
     u.balance += earn;
+    addExp(u, 5);
+    let qmsg5 = addQuestProgress(u, 'fish', 1);
     saveData();
     msg += `\n💰 So du: ${u.balance} VNĐ`;
     reply(msg);
@@ -446,6 +519,9 @@ function handleCommand(api, event) {
     }
     u.balance += payout;
     if (payout > 0) u.wins++; else u.losses++;
+    addExp(u, payout > 0 ? 10 : 2);
+    let qmsg3 = addQuestProgress(u, 'slot', 1);
+    if (payout > 0) qmsg3 += addQuestProgress(u, 'win', 1);
     saveData();
     msg += `\n💰 So du: ${u.balance} VNĐ`;
     reply(msg);
@@ -469,6 +545,9 @@ function handleCommand(api, event) {
     const payout = win ? bet * 50 : 0;
     u.balance += payout;
     if (win) u.wins++; else u.losses++;
+    addExp(u, win ? 15 : 2);
+    let qmsg4 = addQuestProgress(u, 'lotto', 1);
+    if (win) qmsg4 += addQuestProgress(u, 'win', 1);
     saveData();
     reply(`🎯 XO SO\nBan doan: ${String(guess).padStart(2, '0')} - Cuoc: ${bet} VNĐ\nKet qua: ${String(draw).padStart(2, '0')}\n` +
       (win ? `🎉 TRUNG DOC DAC! Nhan ${payout} VNĐ\n💰 So du: ${u.balance} VNĐ` : `😢 Khong trung. Mat ${bet} VNĐ\n💰 So du: ${u.balance} VNĐ`));
@@ -505,6 +584,8 @@ function handleCommand(api, event) {
     if (String(lixi.creatorID) === String(senderID)) { reply('Ban la nguoi tha li xi, khong the tu nhan dau!'); return; }
     const u = getUser(senderID);
     u.balance += lixi.amount;
+    addExp(u, 5);
+    let qmsg9 = addQuestProgress(u, 'lixi', 1);
     saveData();
     reply(`🧧 Chuc mung ban nhan duoc li xi ${lixi.amount} VNĐ!\n💰 So du: ${u.balance} VNĐ`);
     delete activeLixi[threadID];
@@ -531,6 +612,9 @@ function handleCommand(api, event) {
     } else if (normalize(text) === quiz.answer) {
       const u = getUser(senderID);
       u.balance += quiz.reward;
+      addExp(u, 10);
+      let qmsg8 = addQuestProgress(u, 'quiz', 1);
+      qmsg8 += addQuestProgress(u, 'win', 1);
       saveData();
       reply(`🎉 Chinh xac! Ban nhan duoc ${quiz.reward} VNĐ!\nDap an: ${quiz.answer}\n💰 So du: ${u.balance} VNĐ`);
       delete activeQuiz[threadID];
@@ -731,6 +815,73 @@ function handleCommand(api, event) {
     return;
   }
 
+  // ===== LEVEL / EXP =====
+  if (lower === '!level') {
+    const u = getUser(senderID);
+    const need = u.level * 100;
+    reply(`⭐ CAP DO CUA BAN:\nCap: ${u.level}\nEXP: ${u.exp}/${need}\n💰 So du: ${u.balance} VNĐ\nLen cap se nhan thuong: cap * 10.000 VNĐ\nChat nhieu va choi game de nhan EXP!`);
+    return;
+  }
+  if (lower === '!rank') {
+    const sorted = Object.entries(users).sort((a, b) => (b[1].level - a[1].level) || (b[1].exp - a[1].exp)).slice(0, 10);
+    if (!sorted.length) { reply('Chua co ai co cap do.'); return; }
+    let msg = '⭐ BANG XEP HANG CAP DO:\n\n';
+    sorted.forEach(([id, u], i) => { msg += `${i + 1}. ...${String(id).slice(-6)} - Cap ${u.level} (${u.exp} EXP)\n`; });
+    reply(msg);
+    return;
+  }
+
+  // ===== NHIEM VU HANG NGAY =====
+  if (lower === '!quest') {
+    const u = getUser(senderID);
+    const quests = getQuests(u);
+    let msg = '📜 NHIEM VU HOM NAY:\n\n';
+    quests.forEach((q, i) => {
+      msg += `${q.done ? '✅' : '⬜'} ${i + 1}. ${q.desc} (${q.progress}/${q.target}) - ${q.reward} VNĐ\n`;
+    });
+    msg += '\nLam nhiem vu de nhan tien! Nhiem vu moi moi ngay.';
+    reply(msg);
+    return;
+  }
+
+  // ===== DOAN SO =====
+  if (lower.startsWith('!guess')) {
+    const parts = text.split(/\s+/);
+    if (parts.length < 2) {
+      if (activeGuess[senderID]) {
+        reply(`🎯 Ban dang doan so 1-100. Da doan ${activeGuess[senderID].attempts} lan. Go !guess <so> de doan tiep!`);
+      } else {
+        activeGuess[senderID] = { number: 1 + Math.floor(Math.random() * 100), attempts: 0 };
+        reply('🎯 BAT DAU DOAN SO!\nMinh vua nghi 1 so tu 1 den 100.\nGo !guess <so> de doan, vi du: !guess 50');
+      }
+      return;
+    }
+    const guess = parseInt(parts[1], 10);
+    if (isNaN(guess) || guess < 1 || guess > 100) { reply('So phai tu 1 den 100.'); return; }
+    if (!activeGuess[senderID]) {
+      activeGuess[senderID] = { number: 1 + Math.floor(Math.random() * 100), attempts: 0 };
+      reply('🎯 Bat dau van moi! Minh vua nghi 1 so tu 1 den 100. Go !guess <so> de doan!');
+      return;
+    }
+    const game = activeGuess[senderID];
+    game.attempts += 1;
+    if (guess === game.number) {
+      const reward = Math.max(10000, 50000 - game.attempts * 5000);
+      const u = getUser(senderID);
+      u.balance += reward;
+      addExp(u, 20);
+      const qmsg = addQuestProgress(u, 'win', 1);
+      saveData();
+      reply(`🎉 DOAN DUNG SO ${game.number} SAU ${game.attempts} LAN DOAN!\nNhan: ${reward} VNĐ + 20 EXP${qmsg}\n💰 So du: ${u.balance} VNĐ`);
+      delete activeGuess[senderID];
+    } else if (guess < game.number) {
+      reply(`⬆️ So ban doan nho hon! Da doan ${game.attempts} lan. Doan tiep di!`);
+    } else {
+      reply(`⬇️ So ban doan lon hon! Da doan ${game.attempts} lan. Doan tiep di!`);
+    }
+    return;
+  }
+
   // ===== TAI XIU =====
   if (lower.startsWith('!taixiu')) {
     const cd = checkCooldown(senderID, 3);
@@ -768,6 +919,9 @@ function handleCommand(api, event) {
     }
     u.balance += payout;
     if (win) u.wins++; else u.losses++;
+    addExp(u, win ? 10 : 2);
+    let qmsg = addQuestProgress(u, 'taixiu', 1);
+    if (win) qmsg += addQuestProgress(u, 'win', 1);
     saveData();
     msg += win ? `🎉 THANG! Nhan ${payout} VNĐ\n💰 So du: ${u.balance} VNĐ` : `😢 THUA! Mat ${bet} VNĐ\n💰 So du: ${u.balance} VNĐ`;
     reply(msg);
@@ -808,6 +962,9 @@ function handleCommand(api, event) {
     const payout = count === 0 ? 0 : bet * (count + 1); // 1 con nhan 2x, 2 con nhan 3x, 3 con nhan 4x
     u.balance += payout;
     if (count > 0) u.wins++; else u.losses++;
+    addExp(u, count > 0 ? 10 : 2);
+    let qmsg2 = addQuestProgress(u, 'baucua', 1);
+    if (count > 0) qmsg2 += addQuestProgress(u, 'win', 1);
     saveData();
 
     let msg = `🦀 BAU CUA CA TOM\nXuc xac: ${dice.map(d => icons[d]).join(' - ')}\nBan cuoc: ${icons[choice]} ${bet} VNĐ\n`;
@@ -906,6 +1063,17 @@ async function main() {
       if (event.senderID === api.getCurrentUserID()) return;
 
       console.log(`💬 [${event.threadID}] ${event.senderID}: ${event.body}`);
+
+      // Nhan EXP khi chat (cooldown 60s/nguoi de chong farm)
+      try {
+        const nowExp = Date.now();
+        if (!expCooldowns[event.senderID] || nowExp - expCooldowns[event.senderID] > 60000) {
+          expCooldowns[event.senderID] = nowExp;
+          const eu = getUser(event.senderID);
+          addExp(eu, 1);
+          saveData();
+        }
+      } catch (e) {}
 
       // Xu ly lenh bat dau bang ! HOAC tra loi quiz dang cho
       const isCommand = event.body.trim().startsWith('!');
