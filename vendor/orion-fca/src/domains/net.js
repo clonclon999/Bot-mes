@@ -1,0 +1,29 @@
+'use strict';
+/* net — raw escape hatches. */
+
+module.exports = (ctx) => {
+  const { client } = ctx;
+
+  return {
+    httpGet(url, callback) {
+      return ctx.nodeify(client.http.get(url), callback);
+    },
+
+    httpPost(url, form, callback) {
+      return ctx.nodeify((async () => {
+        const body = new URLSearchParams((form && form.form) || form || {});
+        const target = /^https?:\/\//.test(url) ? url : `https://www.facebook.com${url}`;
+        const r = await fetch(target, {
+          method: 'POST',
+          headers: {
+            'user-agent': 'Mozilla/5.0',
+            cookie: client.cookie,
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          body,
+        });
+        return { status: r.status, body: await r.text() };
+      })(), callback);
+    },
+  };
+};

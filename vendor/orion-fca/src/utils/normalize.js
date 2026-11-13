@@ -1,0 +1,171 @@
+'use strict';
+/* Delta → normalized event. Facebook's wire format is not our public format. */
+
+function threadOf(d) {
+  const meta = d.messageMetadata || {};
+  const tk = meta.threadKey || d.threadKey || {};
+  return String(tk.threadFbId || tk.otherUserFbId || (meta.cid && meta.cid.conversationFbid) || '');
+}
+
+/**
+ * Facebook sends reply context in two shapes:
+ *   d.deltaMessageReply.repliedToMessage.messageMetadata → full author + body
+ *   d.deltaMessageReply.replyToMessageId → id only
+ * messageMetadata.replyToMessageId also shows up on some builds.
+ * Read all three; the dispatcher resolves the author when only an id is given.
+ */
+function replyOf(d, meta) {
+  const reply = d.deltaMessageReply;
+
+  if (reply && reply.repliedToMessage) {
+    const rm = reply.repliedToMessage.messageMetadata || {};
+    if (rm.messageId || rm.actorFbId) {
+      return {
+        messageID: String(rm.messageId || ''),
+        senderID: rm.actorFbId ? String(rm.actorFbId) : undefined,
+        body: String(reply.repliedToMessage.body || ''),
+        timestamp: Number(rm.timestamp || 0) || undefined,
+      };
+    }
+  }
+
+  const id = reply && reply.replyToMessageId;
+  if (id) {
+    return { messageID: String(id.id || id) };
+  }
+
+  const mid = meta && meta.replyToMessageId;
+  if (mid) {
+    return { messageID: String(mid.id || mid) };
+  }
+
+  return undefined;
+}
+
+/* A mention is carried as offsets into the body, not as a name:
+ *   data.prng = [{"i":"<uid>","o":0,"l":11}, …]
+ * fall back to the metadata map some clients use. */
+function mentionsOf(d) {
+  const body = String(d.body || '');
+  const out = {};
+
+  let rows = [];
+  try { rows = JSON.parse((d.data && d.data.prng) || '[]'); } catch { rows = []; }
+  if (Array.isArray(rows) && rows.length) {
+    for (const row of rows) {
+      const id = String((row && row.i) || '');
+      const off = parseInt(String((row && row.o) ?? 0), 10) || 0;
+      const len = parseInt(String((row && row.l) ?? 0), 10) || 0;
+      if (id) out[id] = body.substring(off, off + len);
+    }
+    return out;
+  }
+
+  const md = d.messageMetadata || {};
+  const gb = md.data && md.data.data && md.data.data.Gb && md.data.data.Gb.asMap && md.data.data.Gb.asMap.data;
+  if (gb) {
+    for (const key of Object.keys(gb)) {
+      const entry = gb[key] && gb[key].asMap && gb[key].asMap.data;
+      if (!entry) continue;
+      const id = entry.id && entry.id.asLong ? String(entry.id.asLong) : null;
+      const off = parseInt(String((entry.offset && entry.offset.asLong) || 0), 10) || 0;
+      const len = parseInt(String((entry.length && entry.length.asLong) || 0), 10) || 0;
+      if (id) out[id] = body.substring(off, off + len);
+    }
+  }
+  return out;
+}
+
+function deltaToEvent(d) {
+  if (!d || typeof d !== 'object') return null;
+
+  if (d.class === 'NewMessage') {
+    const meta = d.messageMetadata || {};
+    const threadID = threadOf(d);
+    const body = String(d.body || '');
+    if (!threadID || (!body && !(d.attachments || []).length)) return null;
+    return {
+      type: 'message',
+      senderID: String(meta.actorFbId || ''),
+      threadID,
+      messageID: String(meta.messageId || ''),
+      body,
+      timestamp: Number(meta.timestamp || d.actionTimestampMs || 0) || Date.now(),
+      isGroup: Boolean((meta.threadKey || {}).threadFbId),
+      participantIDs: Array.isArray(d.participants) ? d.participants.map(String) : [],
+      attachments: d.attachments || [],
+      mentions: mentionsOf(d),
+      messageReply: replyOf(d, meta),
+    };
+  }
+
+  // participant changes arrive under several class names depending on client
+  if (d.class === 'ParticipantAddedGroupThread' || d.class === 'ParticipantLeftGroupThread') {
+    const threadID = threadOf(d) || String(d.threadFbId || '');
+    if (!threadID) return null;
+
+    const added = d.addedParticipantFbIds || d.addedParticipants || [];
+    const left = d.leftParticipantFbId ? [d.leftParticipantFbId] : [];
+    const list = (Array.isArray(added) ? added : [added]).filter(Boolean).map(String);
+    const gone = (Array.isArray(left) ? left : [left]).filter(Boolean).map(String);
+    const ids = d.class === 'ParticipantAddedGroupThread' ? list : gone;
+
+    return {
+      type: 'log',
+      subtype: d.class === 'ParticipantAddedGroupThread' ? 'log:subscribe' : 'log:unsubscribe',
+      threadID,
+      actorID: String((d.messageMetadata || {}).actorFbId || ''),
+      messageID: String((d.messageMetadata || {}).messageId || ''),
+      participants: ids.map((userID) => ({ userID, name: '' })),
+      text: String((d.messageMetadata || {}).adminText || ''),
+      isGroup: true,
+    };
+  }
+
+  if (d.class === 'LogMessage' || d.class === 'ThreadEvent') {
+    const threadID = threadOf(d) || String(d.threadFbId || '');
+    if (!threadID) return null;
+    return {
+      type: 'log',
+      subtype: String(d.logMessageType || d.subtype || 'unknown'),
+      threadID,
+      actorID: String(d.actorFbId || ''),
+      participants: (d.untypedData && (d.untypedData.addedParticipants || d.untypedData.leftParticipants) || [])
+        .map((p) => ({ userID: String(p.userFbId || ''), name: String(p.fullName || '') }))
+        .filter((p) => p.userID),
+      isGroup: Boolean((d.messageMetadata || {}).threadKey && (d.messageMetadata.threadKey.threadFbId)),
+    };
+  }
+
+  if (d.class === 'ReadReceipt') {
+    return {
+      type: 'read_receipt',
+      threadID: threadOf(d),
+      reader: String(d.actorFbId || ''),
+      time: Number(d.actionTimestampMs || 0),
+    };
+  }
+
+  if (d.class === 'TypingIndicator' || d.class === 'Typing') {
+    return {
+      type: 'typ',
+      threadID: threadOf(d),
+      userID: String(d.actorFbId || ''),
+      isTyping: d.isTyping !== false,
+    };
+  }
+
+  if (d.class === 'Reaction' || (d.messageMetadata && d.messageMetadata.reaction)) {
+    return {
+      type: 'message_reaction',
+      threadID: threadOf(d),
+      messageID: String((d.messageMetadata || {}).messageId || ''),
+      userID: String(d.actorFbId || ''),
+      reaction: String((d.messageMetadata || {}).reaction || ''),
+    };
+  }
+
+  return null;
+}
+
+module.exports = { deltaToEvent };
