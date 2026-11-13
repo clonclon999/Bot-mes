@@ -169,4 +169,9 @@ Chúc bạn thành công! 🚀
 
 ## Xử lý đăng nhập bị treo
 
-Bản hiện tại dùng `@vangbanlanhat/fca-unofficial` và yêu cầu Node.js 22. Nếu đăng nhập không phản hồi sau 90 giây, bot tự thoát để tránh chiếm CPU vô hạn. Không Restart liên tục; kiểm tra APPSTATE/checkpoint trước.
+Bản hiện tại dùng `orion-fca 0.4.0 (ghim đúng commit đã kiểm tra)` và yêu cầu Node.js 22. Nếu đăng nhập không phản hồi sau 90 giây, bot tự thoát để tránh chiếm CPU vô hạn. Không Restart liên tục; kiểm tra APPSTATE/checkpoint trước.
+
+
+## FCA/MQTT mới: Orion
+
+Bot đã chuyển sang `orion-fca` 0.4.0, ghim tại commit `c57c662e48496e8a4373741810ecb21466b57291`. Thư viện này lấy token từ `facebook.com/messages/t/`, tránh lỗi `1357004` do token Messenger cũ, và dùng MQTT mới tại `edge-chat.facebook.com`. Mã nguồn đã được rà soát sơ bộ, chỉ có 2 dependency (`mqtt`, `ws`) và `npm audit` báo 0 lỗ hổng. Đây vẫn là API không chính thức nên không bảo đảm tránh checkpoint.

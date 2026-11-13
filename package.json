@@ -11,7 +11,7 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "@vangbanlanhat/fca-unofficial": "^1.4.6"
+    "orion-fca": "github:irfan420x/orion-fca#c57c662e48496e8a4373741810ecb21466b57291"
   },
   "engines": {
     "node": ">=22 <23"

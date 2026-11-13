@@ -1130,7 +1130,7 @@ function handleCommand(api, event) {
 async function main() {
   let login;
   try {
-    login = require('@vangbanlanhat/fca-unofficial');
+    login = require('orion-fca');
   } catch (e) {
     console.error('❌ Chưa cai thu vien. Hãy chay npm install trước.');
     process.exit(1);
@@ -1138,7 +1138,7 @@ async function main() {
 
   const credentials = getCredentials();
 
-  console.log('⏳ Đang kết nối Facebook (tối đa 90 giây)...');
+  console.log('⏳ Đang kết nối Facebook bằng Orion FCA (tối đa 90 giây)...');
   let loginFinished = false;
   const loginTimeout = setTimeout(() => {
     if (loginFinished) return;
@@ -1183,7 +1183,7 @@ async function main() {
     api.listenMqtt((listenErr, event) => {
       if (listenErr) {
         console.error('❌ Lỗi listen:', listenErr.message || listenErr);
-        console.error('💡 Facebook từ chối MQTT. Hãy kiểm tra Thong báo Facebook > xác nhận đăng nhập moi, rồi lấy lại APPSTATE.');
+        console.error('💡 Orion MQTT chưa kết nối được. Dừng bot và kiểm tra phiên Facebook; không Restart liên tục.');
         return;
       }
       if (!event) return;
