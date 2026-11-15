@@ -1187,6 +1187,10 @@ async function main() {
         return;
       }
       if (!event) return;
+      if (event.type === 'ready') {
+        console.log('✅ MQTT đã kết nối! Bot sẵn sàng nhận lệnh trong nhóm + inbox.');
+        return;
+      }
 
       // Chào mừng / tam biet khi co người vao / rồi khoi nhóm
       if (event.type === 'event') {
@@ -1228,9 +1232,13 @@ async function main() {
       }
     });
 
-    console.log('🚀 Bot đang lang nghe tin nhắn trong nhóm + inbox...');
-    console.log('💡 Thêm acc bot vao nhóm chat Messenger (thủ công) rồi nhắn !ping để test.');
+    console.log('⏳ Đã đăng nhập, đang chờ kết nối MQTT...');
+    console.log('💡 Chỉ khi thấy “MQTT đã kết nối” thì bot mới thật sự nhận được lệnh.');
   });
 }
 
-main();
+if (String(process.env.BOT_DISABLED || '').toLowerCase() === 'true') {
+  console.log('⏸️ BOT_DISABLED=true — chỉ chạy health-check, chưa đăng nhập Facebook.');
+} else {
+  main();
+}
