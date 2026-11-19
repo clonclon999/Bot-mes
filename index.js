@@ -315,7 +315,8 @@ function handleCommand(api, event) {
     const delay = 400 + Math.floor(Math.random() * 601);
     try { if (api.sendTypingIndicator) api.sendTypingIndicator(threadID); } catch (e) {}
     setTimeout(() => {
-      api.sendMessage(msg, threadID, (err) => {
+      // noAck tránh hàng đợi cả nhóm bị kẹt khi Facebook không trả /ls_resp.
+      api.sendMessage({ body: msg, noAck: true }, threadID, (err) => {
         if (err) console.error('❌ Lỗi gửi tin:', err.message || err);
       });
     }, delay);
@@ -1189,6 +1190,11 @@ async function main() {
       if (!event) return;
       if (event.type === 'ready') {
         console.log('✅ MQTT đã kết nối! Bot sẵn sàng nhận lệnh trong nhóm + inbox.');
+        return;
+      }
+      if (event.type === 'mqtt_status') {
+        const extra = event.error ? ` — ${event.error}` : '';
+        console.log(`📡 MQTT ${event.status}${event.endpoint ? ` (${event.endpoint})` : ''}${extra}`);
         return;
       }
 

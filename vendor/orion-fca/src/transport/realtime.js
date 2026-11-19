@@ -48,6 +48,7 @@ class Realtime {
     this.c = client;
     this.lastDeltaAt = Date.now();
     this.watchdog = null;
+    this.heartbeat = null;
     this.client = null;
     this.handlers = [];
     this._retry = 0;
@@ -104,6 +105,7 @@ class Realtime {
     const host = this.endpoints[this.endpointIndex % this.endpoints.length];
     this.endpointIndex += 1;
     this.currentEndpoint = host;
+    this.emit({ type: 'mqtt_status', status: 'connecting', endpoint: host, attempt: this._retry + 1 });
     const url = `wss://${host}/chat?sid=${sid}&cid=${clientId}`;
     const headers = {
       Cookie: this.c.cookie,
@@ -125,7 +127,7 @@ class Realtime {
     this.client.on('error', (e) => {
       const err = new FcaError('MQTT_ERROR', `${this.currentEndpoint || 'MQTT'}: ${String(e.message || e)}`);
       if (this.onError) this.onError(err);
-      this.emit({ type: 'error', error: err.message });
+      this.emit({ type: 'mqtt_status', status: 'error', endpoint: this.currentEndpoint, error: err.message });
       // mirrors the reference client: drop the socket and listen again
       this.reconnect('mqtt error');
     });
@@ -147,6 +149,7 @@ class Realtime {
     // a closed socket used to leave the bot deaf until a manual restart
     this.client.on('close', () => {
       if (this._closing) return;
+      this.emit({ type: 'mqtt_status', status: 'closed', endpoint: this.currentEndpoint });
       this.lastDeltaAt = Date.now();
       this.reconnect('socket closed');
     });
@@ -175,23 +178,29 @@ class Realtime {
     }
   }
 
-  /** Facebook's stream can go quiet without closing. Reconnect when it does. */
+  /**
+   * Chỉ reconnect khi socket thật sự mất kết nối.
+   * Bản gốc reconnect sau 45 giây không có tin nhắn; nhóm yên lặng vì thế bị
+   * ngắt MQTT dù socket vẫn khỏe. MQTT keepalive tự phát hiện socket chết.
+   */
   _startWatchdog() {
     if (this.watchdog) return;
     this.watchdog = setInterval(() => {
-      const idleMs = Date.now() - this.lastDeltaAt;
       if (!this.client || !this.client.connected) {
-        // not connected at all — this is the "silently dead" case
-        this.lastDeltaAt = Date.now();
-        this.reconnect();
-        return;
-      }
-      if (idleMs > 45000) {
-        this.lastDeltaAt = Date.now();
-        this.reconnect();
+        this.emit({ type: 'mqtt_status', status: 'watchdog_reconnect', endpoint: this.currentEndpoint });
+        this.reconnect('watchdog: disconnected');
       }
     }, 30000);
     if (this.watchdog.unref) this.watchdog.unref();
+
+    // Duy trì trạng thái foreground mà không ép reconnect khi nhóm không chat.
+    this.heartbeat = setInterval(() => {
+      if (!this.client || !this.client.connected) return;
+      try {
+        this.client.publish('/foreground_state', JSON.stringify({ foreground: true }), { qos: 0 });
+      } catch { /* sự kiện close/error sẽ xử lý reconnect */ }
+    }, 25000);
+    if (this.heartbeat.unref) this.heartbeat.unref();
   }
 
   /** One reconnect at a time, always with backoff — a tight loop here created
@@ -372,8 +381,11 @@ class Realtime {
     return this;
   }
   close() {
+    this._closing = true;
     if (this.watchdog) { clearInterval(this.watchdog); this.watchdog = null; }
-    try { this.client.end(true); } catch { /* noop */ }
+    if (this.heartbeat) { clearInterval(this.heartbeat); this.heartbeat = null; }
+    if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
+    try { if (this.client) this.client.end(true); } catch { /* noop */ }
     this.client = null;
     this.ready_ = false;
   }

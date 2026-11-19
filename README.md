@@ -179,3 +179,6 @@ Bot đã chuyển sang `orion-fca` 0.4.0, ghim tại commit `c57c662e48496e8a437
 ### MQTT fallback của Bot-mes
 
 Bản vendored `0.4.0-botmes.1` thử luân phiên `edge-chat.facebook.com` và `edge-chat.messenger.com`. Log timeout sẽ ghi rõ endpoint để phân biệt lỗi thư viện với lỗi mạng/IP. Không bật bot liên tục để thử; hãy để tài khoản nghỉ trước.
+
+### MQTT stability botmes.2
+Loại bỏ reconnect sai sau 45 giây không có tin nhắn; dùng MQTT keepalive + foreground heartbeat 25 giây, chỉ reconnect khi socket thật sự mất kết nối; phản hồi lệnh dùng noAck để không kẹt hàng đợi.
