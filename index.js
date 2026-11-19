@@ -21,10 +21,10 @@
  *  !fish          - Di câu cá (cooldown 120s)
  *  !farm          - Trong cay thu hoach (cooldown 180s)
  *  !bank <tiền> @tên - Chuyển tiền cho người khác
- *  !taixiu <tai|xiu|so> <cược>  - Vd: !taixiu tai 10000
- *  !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua của 10000
- *  !slot <cược>   - Quay xeng: !slot 10000
- *  !lotto <so 00-99> <cược> - Xo so: !lotto 69 10000
+ *  !taixiu <tai|xiu|so> <cược>  - Vd: !taixiu tai 10k
+ *  !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua cua 10k
+ *  !slot <cược>   - Quay xeng: !slot 10k
+ *  !lotto <so 00-99> <cược> - Xo so: !lotto 69 10k
  *  !lixi <tiền>   - Tha lixi, người khác go !nhận để nhận
  *  !quiz          - Do vui co thưởng (trả lời đúng dau tiền được tiền)
  *  !soicau        - Xem lịch sử + thống kê Tai/Xiu (chỉ thống kê, không đủ đoán được kết quả that)
@@ -276,7 +276,7 @@ function addQuestProgress(user, type, amount = 1) {
       if (q.progress >= q.target) {
         q.done = true;
         user.balance += q.reward;
-        rewardMsg += `\n📜 Hoan thanh nhiệm vụ "${q.desc}"! +${q.reward} VNĐ`;
+        rewardMsg += `\n📜 Hoan thanh nhiệm vụ "${q.desc}"! +${formatVnd(q.reward)}`;
       }
     }
   }
@@ -285,6 +285,44 @@ function addQuestProgress(user, type, amount = 1) {
 }
 function normalize(str) {
   return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
+}
+
+// Định dạng tiền kiểu Việt Nam: 1000000 -> 1.000.000 VNĐ
+function formatNumber(amount) {
+  return Math.trunc(Number(amount) || 0).toLocaleString('vi-VN');
+}
+function formatVnd(amount) {
+  return `${formatNumber(amount)} VNĐ`;
+}
+
+// Hỗ trợ: 10000, 10.000, 50k, 1,5tr, 1m, 1 tỷ, all/max/tất tay, half/nửa.
+function parseAmountInput(raw, maxAvailable = 0) {
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
+  let str = normalize(String(raw || '')).replace(/₫/g, '').trim();
+  if (!str) return 0;
+  if (['all', 'max', 'tattay', 'tat tay'].includes(str)) return Math.max(0, Math.floor(Number(maxAvailable) || 0));
+  if (['half', '1/2', 'nua'].includes(str)) return Math.max(0, Math.floor((Number(maxAvailable) || 0) / 2));
+  str = str.replace(/\s+/g, '').replace(/vnd$/i, '');
+  const match = str.match(/^(\d+(?:[.,]\d+)?)(k|nghin|ngan|m|tr|trieu|b|ty)?$/i);
+  if (!match) return 0;
+  const unit = (match[2] || '').toLowerCase();
+  if (!unit) {
+    const digits = match[1].replace(/[.,]/g, '');
+    return /^\d+$/.test(digits) ? Math.floor(Number(digits)) : 0;
+  }
+  const value = Number(match[1].replace(',', '.'));
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  let mult = 1;
+  if (['k', 'nghin', 'ngan'].includes(unit)) mult = 1_000;
+  else if (['m', 'tr', 'trieu'].includes(unit)) mult = 1_000_000;
+  else if (['b', 'ty'].includes(unit)) mult = 1_000_000_000;
+  return Math.floor(value * mult);
+}
+
+function progressBar(current, total, size = 10) {
+  const ratio = Math.max(0, Math.min(1, Number(current) / Math.max(1, Number(total))));
+  const filled = Math.round(ratio * size);
+  return `${'▰'.repeat(filled)}${'▱'.repeat(size - filled)} ${Math.round(ratio * 100)}%`;
 }
 
 function checkCooldown(senderID, seconds) {
@@ -297,10 +335,10 @@ function checkCooldown(senderID, seconds) {
 }
 
 function parseBet(args, user) {
-  const bet = parseInt(args[args.length - 1], 10);
-  if (isNaN(bet) || bet <= 0) return { error: 'Cuoc phai la so > 0. Vd: !taixiu tai 10000' };
-  if (bet > user.balance) return { error: `Không du VNĐ! Số dư của bạn: ${user.balance} VNĐ` };
-  if (bet > 10000000) return { error: 'Cuoc tối đa 10.000.000 VNĐ/ván.' };
+  const bet = parseAmountInput(args[args.length - 1], user.balance);
+  if (!bet || bet <= 0) return { error: 'Cược phải lớn hơn 0. Hỗ trợ: 10k, 1tr, all, half.\nVí dụ: !taixiu tai 10k' };
+  if (bet > user.balance) return { error: `❌ Không đủ tiền!\n💰 Số dư: ${formatVnd(user.balance)}` };
+  if (bet > 10000000) return { error: '⚠️ Mỗi ván cược tối đa 10.000.000 VNĐ.' };
   return { bet };
 }
 
@@ -340,16 +378,17 @@ function handleCommand(api, event) {
       '• !balance - Xem số dư\n• !daily - Nhận 50.000 VNĐ mỗi ngày\n• !diemdanh - Diem danh theo streak\n• !work - Lam viec nhận VNĐ\n' +
       '• !fish - Di câu cá\n• !farm - Trong cay thu hoach\n' +
       '• !bank <số tiền> @tên - Chuyển tiền cho người khác\n' +
-      '  Vd: !bank 50000 @TenBan\n' +
-      '• !taixiu <tai|xiu|so> <cược> - Vd: !taixiu tai 10000\n' +
-      '• !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua của 10000\n' +
-      '• !slot <cược> - Quay xeng, Vd: !slot 10000\n' +
-      '• !lotto <so 00-99> <cược> - Xo so, Vd: !lotto 69 10000\n' +
+      '  Vd: !bank 50k @TenBan\n' +
+      '• !taixiu <tai|xiu|so> <cược> - Vd: !taixiu tai 10k\n' +
+      '• !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua cua 10k\n' +
+      '• !slot <cược> - Quay xeng, Vd: !slot 10k\n' +
+      '• !lotto <so 00-99> <cược> - Xo so, Vd: !lotto 69 10k\n' +
       '• !lixi <tiền> - Tha lixi, người khác go !nhận để nhận\n' +
       '• !quiz - Do vui co thưởng (trả lời đúng dau tiền)\n' +
       '• !soicau - Xem lịch sử Tai/Xiu\n• !top - Dai gia nhat nhóm\n' +
       '• !level - Xem cấp độ của bạn\n• !rank - Xếp hạng cấp độ\n• !quest - Nhiem vu hàng ngày\n• !guess <so> - Đoán so 1-100\n' +
       '• !reaction - Game phản xạ, ai go !go nhanh nhat\n• !trieuphu - Ai la trieu phu 5 câu\n\n' +
+      '💡 NHẬP TIỀN NHANH: 10k = 10.000 | 1tr = 1.000.000 | all = tất tay | half = nửa số dư\n\n' +
       'Bot chỉ trả lời khi co dau ! để tranh spam nhóm.\nAdmin go !adminhelp để xem lệnh quan tri.');
     return;
   }
@@ -387,7 +426,7 @@ function handleCommand(api, event) {
   // ===== TIEN XU AO =====
   if (lower === '!balance' || lower === '!bal' || lower === '!tiền') {
     const u = getUser(senderID);
-    reply(`💰 Số dư của bạn: ${u.balance} VNĐ\n🏆 Thắng: ${u.wins} | Thua: ${u.losses}`);
+    reply(`╭─── 💳 VÍ CỦA BẠN ───╮\n│ 💰 Số dư: ${formatVnd(u.balance)}\n│ 🏆 Thắng: ${u.wins}   💔 Thua: ${u.losses}\n╰──────────────────╯`);
     return;
   }
   if (lower === '!daily') {
@@ -401,7 +440,7 @@ function handleCommand(api, event) {
     u.lastDaily = now;
     u.balance += DAILY_REWARD;
     saveData();
-    reply(`🎁 Nhận daily thành công! +${DAILY_REWARD} VNĐ\n💰 Số dư hiện tại: ${u.balance} VNĐ`);
+    reply(`╭── 🎁 QUÀ HẰNG NGÀY ──╮\n│ ✅ Nhận: +${formatVnd(DAILY_REWARD)}\n│ 💰 Số dư: ${formatVnd(u.balance)}\n╰──────────────────╯`);
     return;
   }
   if (lower === '!work') {
@@ -413,14 +452,14 @@ function handleCommand(api, event) {
     addExp(u, 5);
     let qmsg6 = addQuestProgress(u, 'work', 1);
     saveData();
-    reply(`💼 Bạn da làm việc va nhận được ${earn} VNĐ!\n💰 Số dư: ${u.balance} VNĐ`);
+    reply(`╭─── 💼 LÀM VIỆC ───╮\n│ 💵 Thu nhập: +${formatVnd(earn)}\n│ 💰 Số dư: ${formatVnd(u.balance)}\n╰─────────────────╯`);
     return;
   }
   if (lower === '!top') {
     const sorted = Object.entries(users).sort((a, b) => b[1].balance - a[1].balance).slice(0, 10);
     if (!sorted.length) { reply('Chưa co ai chơi. Go !daily để nhận VNĐ dau tiền!'); return; }
     let msg = '🏆 BANG XEP HANG DAI GIA:\n\n';
-    sorted.forEach(([id, u], i) => { msg += `${i + 1}. ${id.slice(-6)}... - ${u.balance} VNĐ\n`; });
+    sorted.forEach(([id, u], i) => { msg += `${i + 1}. ${id.slice(-6)}... - ${formatVnd(u.balance)}\n`; });
     reply(msg);
     return;
   }
@@ -446,17 +485,16 @@ function handleCommand(api, event) {
     // Lay số tiền: so dau tiền trong parts sau lệnh
     let amount = null;
     for (let i = 1; i < parts.length; i++) {
-      const n = parseInt(parts[i], 10);
-      if (!isNaN(n) && n > 0 && String(n) === parts[i].replace(/,/g, '')) { amount = n; break; }
-      if (!isNaN(n) && n > 0) { amount = n; break; }
+      const n = parseAmountInput(parts[i], getUser(senderID).balance);
+      if (n > 0) { amount = n; break; }
     }
 
     if (!recipientID) {
-      reply('Cu phap: !bank <số tiền> @tên\nVd: !bank 50000 @TenBan\n(Hãy @ tên người nhận trong tin nhắn)');
+      reply('Cu phap: !bank <số tiền> @tên\nVd: !bank 50k @TenBan\n(Hãy @ tên người nhận trong tin nhắn)');
       return;
     }
     if (!amount || amount <= 0) {
-      reply('So tiền chuyển phai > 0. Vd: !bank 50000 @TenBan');
+      reply('So tiền chuyển phai > 0. Vd: !bank 50k @TenBan');
       return;
     }
     if (recipientID === String(senderID)) {
@@ -465,7 +503,7 @@ function handleCommand(api, event) {
     }
     const sender = getUser(senderID);
     if (amount > sender.balance) {
-      reply(`Không du VNĐ! Số dư của bạn: ${sender.balance} VNĐ`);
+      reply(`Không du VNĐ! Số dư của bạn: ${formatVnd(sender.balance)}`);
       return;
     }
     if (amount > 10000000) {
@@ -478,7 +516,7 @@ function handleCommand(api, event) {
     addExp(sender, 5);
     let qmsg7 = addQuestProgress(sender, 'bank', 1);
     saveData();
-    reply(`💸 CHUYỂN TIỀN THÀNH CÔNG!\nTu: ${String(senderID).slice(-6)}...\nDen: ${recipientName || ('...' + String(recipientID).slice(-6))}\nSo tiền: ${amount} VNĐ\n💰 Số dư của bạn: ${sender.balance} VNĐ`);
+    reply(`💸 CHUYỂN TIỀN THÀNH CÔNG!\nTu: ${String(senderID).slice(-6)}...\nDen: ${recipientName || ('...' + String(recipientID).slice(-6))}\nSo tiền: ${formatVnd(amount)}\n💰 Số dư của bạn: ${formatVnd(sender.balance)}`);
     return;
   }
 
@@ -499,7 +537,7 @@ function handleCommand(api, event) {
     const reward = 30000 + u.streak * 5000;
     u.balance += reward;
     saveData();
-    reply(`📅 ĐIỂM DANH THÀNH CÔNG! Ngày thu ${u.streak}\nNhan: ${reward} VNĐ\n💰 Số dư: ${u.balance} VNĐ`);
+    reply(`📅 ĐIỂM DANH THÀNH CÔNG! Ngày thu ${u.streak}\nNhan: ${formatVnd(reward)}\n💰 Số dư: ${formatVnd(u.balance)}`);
     return;
   }
 
@@ -511,14 +549,14 @@ function handleCommand(api, event) {
     const r = Math.random();
     let earn = 0, msg = '🎣 Bạn da di câu cá...\n';
     if (r < 0.3) { msg += '😢 Không câu được con nao!'; }
-    else if (r < 0.8) { earn = 5000 + Math.floor(Math.random() * 10001); msg += `🐟 Cau được ca nho! +${earn} VNĐ`; }
-    else if (r < 0.95) { earn = 20000 + Math.floor(Math.random() * 30001); msg += `🐠 Cau được ca to! +${earn} VNĐ`; }
-    else { earn = 100000 + Math.floor(Math.random() * 100001); msg += `✨ CAU DUOC CA VANG! +${earn} VNĐ`; }
+    else if (r < 0.8) { earn = 5000 + Math.floor(Math.random() * 10001); msg += `🐟 Cau được ca nho! +${formatVnd(earn)}`; }
+    else if (r < 0.95) { earn = 20000 + Math.floor(Math.random() * 30001); msg += `🐠 Cau được ca to! +${formatVnd(earn)}`; }
+    else { earn = 100000 + Math.floor(Math.random() * 100001); msg += `✨ CAU DUOC CA VANG! +${formatVnd(earn)}`; }
     u.balance += earn;
     addExp(u, 5);
     let qmsg5 = addQuestProgress(u, 'fish', 1);
     saveData();
-    msg += `\n💰 Số dư: ${u.balance} VNĐ`;
+    msg += `\n💰 Số dư: ${formatVnd(u.balance)}`;
     reply(msg);
     return;
   }
@@ -529,11 +567,11 @@ function handleCommand(api, event) {
     const r = Math.random();
     let earn = 0, msg = '🌱 Bạn da thu hoach vuon cay...\n';
     if (r < 0.2) { msg += '🥀 Cay bi sau an, mất trang!'; }
-    else if (r < 0.75) { earn = 10000 + Math.floor(Math.random() * 20001); msg += `🍚 Thu hoach lua/rau! +${earn} VNĐ`; }
-    else { earn = 40000 + Math.floor(Math.random() * 60001); msg += `🍉 Thu hoach được qua ngon! +${earn} VNĐ`; }
+    else if (r < 0.75) { earn = 10000 + Math.floor(Math.random() * 20001); msg += `🍚 Thu hoach lua/rau! +${formatVnd(earn)}`; }
+    else { earn = 40000 + Math.floor(Math.random() * 60001); msg += `🍉 Thu hoach được qua ngon! +${formatVnd(earn)}`; }
     u.balance += earn;
     saveData();
-    msg += `\n💰 Số dư: ${u.balance} VNĐ`;
+    msg += `\n💰 Số dư: ${formatVnd(u.balance)}`;
     reply(msg);
     return;
   }
@@ -543,22 +581,22 @@ function handleCommand(api, event) {
     const cd = checkCooldown(senderID, 5);
     if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi quay được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 2) { reply('Cu phap: !slot <cược>\nVd: !slot 10000'); return; }
+    if (parts.length < 2) { reply('Cu phap: !slot <cược>\nVd: !slot 10k'); return; }
     const { bet, error } = parseBet(parts, getUser(senderID));
     if (error) { reply(error); return; }
     const u = getUser(senderID);
     u.balance -= bet;
     const syms = ['🍒', '🍋', '🍇', '⭐', '💎', '7️⃣'];
     const spin = [syms[Math.floor(Math.random() * 6)], syms[Math.floor(Math.random() * 6)], syms[Math.floor(Math.random() * 6)]];
-    let payout = 0, msg = `🎰 QUAY XENG\n${spin.join(' | ')}\nCuoc: ${bet} VNĐ\n`;
+    let payout = 0, msg = `🎰 QUAY XENG\n${spin.join(' | ')}\nCuoc: ${formatVnd(bet)}\n`;
     if (spin[0] === spin[1] && spin[1] === spin[2]) {
       payout = bet * 10;
-      msg += `🎉 JACKPOT 3 GIONG NHAU! Nhận ${payout} VNĐ`;
+      msg += `🎉 JACKPOT 3 GIONG NHAU! Nhận ${formatVnd(payout)}`;
     } else if (spin[0] === spin[1] || spin[1] === spin[2] || spin[0] === spin[2]) {
       payout = bet * 2;
-      msg += `😊 Trúng 2 o! Nhận ${payout} VNĐ`;
+      msg += `😊 Trúng 2 o! Nhận ${formatVnd(payout)}`;
     } else {
-      msg += `😢 Không trúng. Mat ${bet} VNĐ`;
+      msg += `😢 Không trúng. Mat ${formatVnd(bet)}`;
     }
     u.balance += payout;
     if (payout > 0) u.wins++; else u.losses++;
@@ -566,7 +604,7 @@ function handleCommand(api, event) {
     let qmsg3 = addQuestProgress(u, 'slot', 1);
     if (payout > 0) qmsg3 += addQuestProgress(u, 'win', 1);
     saveData();
-    msg += `\n💰 Số dư: ${u.balance} VNĐ`;
+    msg += `\n💰 Số dư: ${formatVnd(u.balance)}`;
     reply(msg);
     return;
   }
@@ -576,7 +614,7 @@ function handleCommand(api, event) {
     const cd = checkCooldown(senderID, 5);
     if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 3) { reply('Cu phap: !lotto <so 00-99> <cược>\nVd: !lotto 69 10000'); return; }
+    if (parts.length < 3) { reply('Cu phap: !lotto <so 00-99> <cược>\nVd: !lotto 69 10k'); return; }
     const guess = parseInt(parts[1], 10);
     if (isNaN(guess) || guess < 0 || guess > 99) { reply('So phai tu 00 đến 99.'); return; }
     const { bet, error } = parseBet(parts, getUser(senderID));
@@ -592,8 +630,8 @@ function handleCommand(api, event) {
     let qmsg4 = addQuestProgress(u, 'lotto', 1);
     if (win) qmsg4 += addQuestProgress(u, 'win', 1);
     saveData();
-    reply(`🎯 XO SO\nBan đoán: ${String(guess).padStart(2, '0')} - Cuoc: ${bet} VNĐ\nKet qua: ${String(draw).padStart(2, '0')}\n` +
-      (win ? `🎉 TRUNG DOC DAC! Nhận ${payout} VNĐ\n💰 Số dư: ${u.balance} VNĐ` : `😢 Không trúng. Mat ${bet} VNĐ\n💰 Số dư: ${u.balance} VNĐ`));
+    reply(`🎯 XO SO\nBan đoán: ${String(guess).padStart(2, '0')} - Cuoc: ${formatVnd(bet)}\nKet qua: ${String(draw).padStart(2, '0')}\n` +
+      (win ? `🎉 TRUNG DOC DAC! Nhận ${formatVnd(payout)}\n💰 Số dư: ${formatVnd(u.balance)}` : `😢 Không trúng. Mat ${formatVnd(bet)}\n💰 Số dư: ${formatVnd(u.balance)}`));
     return;
   }
 
@@ -604,13 +642,13 @@ function handleCommand(api, event) {
       // Bot lì xì mien phi cho nhóm
       const amount = 10000 + Math.floor(Math.random() * 20001);
       activeLixi[threadID] = { amount, creatorID: 'bot', expiresAt: Date.now() + 60000 };
-      reply(`🧧 BOT LI XI ${amount} VNĐ! Ai nhanh tay go !nhận trước thi được! (hết hạn sau 60s)`);
+      reply(`🧧 BOT LI XI ${formatVnd(amount)}! Ai nhanh tay go !nhận trước thi được! (hết hạn sau 60s)`);
       return;
     }
-    const amount = parseInt(parts[1], 10);
+    const amount = parseAmountInput(parts[1], u.balance);
     if (isNaN(amount) || amount <= 0) { reply('So tiền lì xì phai > 0. Vd: !lixi 50000'); return; }
     const u = getUser(senderID);
-    if (amount > u.balance) { reply(`Không du VNĐ! Số dư: ${u.balance} VNĐ`); return; }
+    if (amount > u.balance) { reply(`Không du VNĐ! Số dư: ${formatVnd(u.balance)}`); return; }
     if (activeLixi[threadID] && Date.now() < activeLixi[threadID].expiresAt) {
       reply('Da co lì xì đang cho, cho người ta nhận xong hoặc hết hạn moi tha tiếp.');
       return;
@@ -618,7 +656,7 @@ function handleCommand(api, event) {
     u.balance -= amount;
     activeLixi[threadID] = { amount, creatorID: senderID, expiresAt: Date.now() + 60000 };
     saveData();
-    reply(`🧧 Da tha lì xì ${amount} VNĐ! Ai nhanh tay go !nhận trước thi được! (hết hạn sau 60s)`);
+    reply(`🧧 Da tha lì xì ${formatVnd(amount)}! Ai nhanh tay go !nhận trước thi được! (hết hạn sau 60s)`);
     return;
   }
   if (lower === '!nhận') {
@@ -630,7 +668,7 @@ function handleCommand(api, event) {
     addExp(u, 5);
     let qmsg9 = addQuestProgress(u, 'lixi', 1);
     saveData();
-    reply(`🧧 Chúc mừng bạn nhận được lì xì ${lixi.amount} VNĐ!\n💰 Số dư: ${u.balance} VNĐ`);
+    reply(`🧧 Chúc mừng bạn nhận được lì xì ${formatVnd(lixi.amount)}!\n💰 Số dư: ${formatVnd(u.balance)}`);
     delete activeLixi[threadID];
     return;
   }
@@ -644,7 +682,7 @@ function handleCommand(api, event) {
     const q = QUIZ_QUESTIONS[Math.floor(Math.random() * QUIZ_QUESTIONS.length)];
     const reward = 20000;
     activeQuiz[threadID] = { question: q.q, answer: normalize(q.a), reward, expiresAt: Date.now() + 60000 };
-    reply(`🧠 DO VUI CO THUONG ${reward} VNĐ!\n${q.q}\nTra lỗi đúng dau tiền (go đáp án, không can dau !) se được thưởng! (60s)`);
+    reply(`🧠 DO VUI CO THUONG ${formatVnd(reward)}!\n${q.q}\nTra lỗi đúng dau tiền (go đáp án, không can dau !) se được thưởng! (60s)`);
     return;
   }
   // Kiem tra trả lời quiz (tin nhắn không co dau !)
@@ -659,7 +697,7 @@ function handleCommand(api, event) {
       let qmsg8 = addQuestProgress(u, 'quiz', 1);
       qmsg8 += addQuestProgress(u, 'win', 1);
       saveData();
-      reply(`🎉 Chinh xac! Bạn nhận được ${quiz.reward} VNĐ!\nDap an: ${quiz.answer}\n💰 Số dư: ${u.balance} VNĐ`);
+      reply(`🎉 Chinh xac! Bạn nhận được ${formatVnd(quiz.reward)}!\nDap an: ${quiz.answer}\n💰 Số dư: ${formatVnd(u.balance)}`);
       delete activeQuiz[threadID];
       return;
     }
@@ -794,11 +832,11 @@ function handleCommand(api, event) {
     if (!target) { reply('Cu phap: !give @tên <tiền>\nVd: !give @TenBan 50000'); return; }
     const parts = text.split(/\s+/);
     let amount = null;
-    for (const part of parts) { const n = parseInt(part, 10); if (!isNaN(n) && n > 0) { amount = n; break; } }
+    for (const part of parts) { const n = parseAmountInput(part); if (n > 0) { amount = n; break; } }
     if (!amount) { reply('So tiền phai > 0.'); return; }
     getUser(target).balance += amount;
     saveData();
-    reply(`🎁 Admin da tặng ${amount} VNĐ cho ${getMentionName() || ('...' + String(target).slice(-6))}`);
+    reply(`🎁 Admin da tặng ${formatVnd(amount)} cho ${getMentionName() || ('...' + String(target).slice(-6))}`);
     return;
   }
   if (lower.startsWith('!reset')) {
@@ -807,7 +845,7 @@ function handleCommand(api, event) {
     if (!target) { reply('Cu phap: !reset @tên'); return; }
     getUser(target).balance = START_BALANCE;
     saveData();
-    reply(`🔄 Da reset tiền của ${getMentionName() || ('...' + String(target).slice(-6))} ve ${START_BALANCE} VNĐ`);
+    reply(`🔄 Da reset tiền của ${getMentionName() || ('...' + String(target).slice(-6))} ve ${formatVnd(START_BALANCE)}`);
     return;
   }
   if (lower === '!stats') {
@@ -815,7 +853,7 @@ function handleCommand(api, event) {
     const totalMoney = Object.values(users).reduce((s, u) => s + (u.balance || 0), 0);
     const totalWins = Object.values(users).reduce((s, u) => s + (u.wins || 0), 0);
     const totalLosses = Object.values(users).reduce((s, u) => s + (u.losses || 0), 0);
-    reply(`📊 THONG KE NHOM:\n• Tổng người chơi: ${totalUsers}\n• Tổng tiền luu thong: ${totalMoney} VNĐ\n• Tổng ván thắng: ${totalWins}\n• Tổng ván thua: ${totalLosses}\n• So admin: ${admins.length}\n• Lich su Tai Xiu: ${taixiuHistory.length} ván`);
+    reply(`📊 THONG KE NHOM:\n• Tổng người chơi: ${totalUsers}\n• Tổng tiền luu thong: ${formatVnd(totalMoney)}\n• Tổng ván thắng: ${totalWins}\n• Tổng ván thua: ${totalLosses}\n• So admin: ${admins.length}\n• Lich su Tai Xiu: ${taixiuHistory.length} ván`);
     return;
   }
   if (lower.startsWith('!settitle')) {
@@ -862,7 +900,7 @@ function handleCommand(api, event) {
   if (lower === '!level') {
     const u = getUser(senderID);
     const need = u.level * 100;
-    reply(`⭐ CẤP ĐỘ CỦA BẠN:\nCap: ${u.level}\nEXP: ${u.exp}/${need}\n💰 Số dư: ${u.balance} VNĐ\nLen cấp se nhận thưởng: cấp * 10.000 VNĐ\nChat nhiều va chơi game để nhận EXP!`);
+    reply(`╭─── ⭐ HỒ SƠ CẤP ĐỘ ───╮\n│ Cấp: ${u.level}\n│ EXP: ${u.exp}/${need}\n│ ${progressBar(u.exp, need)}\n│ 💰 Số dư: ${formatVnd(u.balance)}\n│ 🎁 Lên cấp: +${formatVnd(u.level * 10000)}\n╰────────────────────╯`);
     return;
   }
   if (lower === '!rank') {
@@ -880,7 +918,7 @@ function handleCommand(api, event) {
     const quests = getQuests(u);
     let msg = '📜 NHIEM VU HOM NAY:\n\n';
     quests.forEach((q, i) => {
-      msg += `${q.done ? '✅' : '⬜'} ${i + 1}. ${q.desc} (${q.progress}/${q.target}) - ${q.reward} VNĐ\n`;
+      msg += `${q.done ? '✅' : '⬜'} ${i + 1}. ${q.desc} (${q.progress}/${q.target}) - ${formatVnd(q.reward)}\n`;
     });
     msg += '\nLam nhiệm vụ để nhận tiền! Nhiem vu moi mỗi ngày.';
     reply(msg);
@@ -915,7 +953,7 @@ function handleCommand(api, event) {
       addExp(u, 20);
       const qmsg = addQuestProgress(u, 'win', 1);
       saveData();
-      reply(`🎉 ĐOÁN ĐÚNG SỐ ${game.number} SAU ${game.attempts} LAN DOAN!\nNhan: ${reward} VNĐ + 20 EXP${qmsg}\n💰 Số dư: ${u.balance} VNĐ`);
+      reply(`🎉 ĐOÁN ĐÚNG SỐ ${game.number} SAU ${game.attempts} LAN DOAN!\nNhan: ${formatVnd(reward)} + 20 EXP${qmsg}\n💰 Số dư: ${formatVnd(u.balance)}`);
       delete activeGuess[senderID];
     } else if (guess < game.number) {
       reply(`⬆️ So bạn đoán nhỏ hơn! Da đoán ${game.attempts} lần. Đoán tiếp di!`);
@@ -965,7 +1003,7 @@ function handleCommand(api, event) {
     u.balance += reward;
     addExp(u, 10);
     saveData();
-    reply(`⚡ ${String(senderID).slice(-6)}... phản xạ trong ${(ms / 1000).toFixed(2)}s! Nhận ${reward} VNĐ\n💰 Số dư: ${u.balance} VNĐ`);
+    reply(`⚡ ${String(senderID).slice(-6)}... phản xạ trong ${(ms / 1000).toFixed(2)}s! Nhận ${formatVnd(reward)}\n💰 Số dư: ${formatVnd(u.balance)}`);
     delete activeReaction[threadID];
     return;
   }
@@ -979,7 +1017,7 @@ function handleCommand(api, event) {
     }
     const shuffled = [...TRIEUPHU_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 5);
     activeTrieuphu[senderID] = { step: 0, questions: shuffled, earned: 0 };
-    reply(`🎓 AI LA TRIEU PHU!\nTra lỗi đúng 5 câu liên tiếp để nhận tổng ${TRIEUPHU_REWARDS.reduce((a, b) => a + b, 0)} VNĐ!\n\nCau 1/5 (${TRIEUPHU_REWARDS[0]} VNĐ): ${shuffled[0].q}\nTra lỗi đúng (go đáp án) để qua câu!`);
+    reply(`🎓 AI LA TRIEU PHU!\nTra lỗi đúng 5 câu liên tiếp để nhận tổng ${formatVnd(TRIEUPHU_REWARDS.reduce((a, b) => a + b, 0))}!\n\nCau 1/5 (${formatVnd(TRIEUPHU_REWARDS[0])}): ${shuffled[0].q}\nTra lỗi đúng (go đáp án) để qua câu!`);
     return;
   }
   // Kiem tra trả lời Trieu Phu (tin nhắn không co dau !)
@@ -995,15 +1033,15 @@ function handleCommand(api, event) {
       g.step += 1;
       saveData();
       if (g.step >= 5) {
-        reply(`🎉 CHÚC MỪNG BẠN LÀ TRIỆU PHÚ!\nBan da trả lời đúng 5/5 câu!\nTong nhận: ${g.earned} VNĐ\n💰 Số dư: ${u.balance} VNĐ`);
+        reply(`🎉 CHÚC MỪNG BẠN LÀ TRIỆU PHÚ!\nBan da trả lời đúng 5/5 câu!\nTong nhận: ${formatVnd(g.earned)}\n💰 Số dư: ${formatVnd(u.balance)}`);
         delete activeTrieuphu[senderID];
       } else {
-        reply(`✅ Đúng rồi! +${reward} VNĐ (tổng đã nhận: ${g.earned} VNĐ)\n\nCau ${g.step + 1}/5 (${TRIEUPHU_REWARDS[g.step]} VNĐ): ${g.questions[g.step].q}`);
+        reply(`✅ Đúng rồi! +${formatVnd(reward)} (tổng đã nhận: ${formatVnd(g.earned)})\n\nCau ${g.step + 1}/5 (${formatVnd(TRIEUPHU_REWARDS[g.step])}): ${g.questions[g.step].q}`);
       }
       return;
     } else {
       const u = getUser(senderID);
-      reply(`❌ Sai rồi! Đáp án la: ${current.a}\nBan đúng o câu ${g.step + 1}/5, đã nhận được ${g.earned} VNĐ. Go !trieuphu để chơi lại!`);
+      reply(`❌ Sai rồi! Đáp án la: ${current.a}\nBan đúng o câu ${g.step + 1}/5, đã nhận được ${formatVnd(g.earned)}. Go !trieuphu để chơi lại!`);
       delete activeTrieuphu[senderID];
       return;
     }
@@ -1014,7 +1052,7 @@ function handleCommand(api, event) {
     const cd = checkCooldown(senderID, 3);
     if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 3) { reply('Cu phap: !taixiu <tai|xiu|so> <cược>\nVd: !taixiu tai 10000\nVd: !taixiu 11 100 (đoán tổng = 11)'); return; }
+    if (parts.length < 3) { reply('Cu phap: !taixiu <tai|xiu|so> <cược>\nVd: !taixiu tai 10k\nVd: !taixiu 11 100 (đoán tổng = 11)'); return; }
     const choiceRaw = normalize(parts[1]);
     const { bet, error } = parseBet(parts, getUser(senderID));
     if (error) { reply(error); return; }
@@ -1032,13 +1070,13 @@ function handleCommand(api, event) {
     if (choiceRaw === 'tai' || choiceRaw === 'xiu') {
       win = (choiceRaw === result);
       payout = win ? bet * 2 : 0;
-      msg = `🎲 TÀI XỈU\nXuc xac: ${dice.join(' - ')} = ${sum} => ${result.toUpperCase()}${isTriple ? ' (BO BAO - tinh XIU)' : ''}\nBan cược: ${choiceRaw.toUpperCase()} ${bet} VNĐ\n`;
+      msg = `🎲 TÀI XỈU\nXuc xac: ${dice.join(' - ')} = ${sum} => ${result.toUpperCase()}${isTriple ? ' (BO BAO - tinh XIU)' : ''}\nBan cược: ${choiceRaw.toUpperCase()} ${formatVnd(bet)}\n`;
     } else if (!isNaN(parseInt(choiceRaw, 10))) {
       const guess = parseInt(choiceRaw, 10);
       if (guess < 3 || guess > 18) { u.balance += bet; reply('Tổng phai tu 3 đến 18. Da hoan VNĐ.'); return; }
       win = (guess === sum);
       payout = win ? bet * 5 : 0;
-      msg = `🎲 TÀI XỈU (đoán tổng)\nXuc xac: ${dice.join(' - ')} = ${sum}\nBan đoán: ${guess} - Cuoc: ${bet} VNĐ\n`;
+      msg = `🎲 TÀI XỈU (đoán tổng)\nXuc xac: ${dice.join(' - ')} = ${sum}\nBan đoán: ${guess} - Cuoc: ${formatVnd(bet)}\n`;
     } else {
       u.balance += bet;
       reply('Lua chon phai la: tai / xiu / so (3-18). Da hoan VNĐ.');
@@ -1050,7 +1088,7 @@ function handleCommand(api, event) {
     let qmsg = addQuestProgress(u, 'taixiu', 1);
     if (win) qmsg += addQuestProgress(u, 'win', 1);
     saveData();
-    msg += win ? `🎉 THANG! Nhận ${payout} VNĐ\n💰 Số dư: ${u.balance} VNĐ` : `😢 THUA! Mat ${bet} VNĐ\n💰 Số dư: ${u.balance} VNĐ`;
+    msg += win ? `🎉 THANG! Nhận ${formatVnd(payout)}\n💰 Số dư: ${formatVnd(u.balance)}` : `😢 THUA! Mat ${formatVnd(bet)}\n💰 Số dư: ${formatVnd(u.balance)}`;
     reply(msg);
     return;
   }
@@ -1071,7 +1109,7 @@ function handleCommand(api, event) {
     if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
     const parts = text.split(/\s+/);
     if (parts.length < 3) {
-      sendWithImage('🦀 BẦU CUA CÁ TÔM\nCu phap: !baucua <bau|của|tom|ca|ga|nai> <cược>\nVd: !baucua của 10000\nVd: !baucua tom 200');
+      sendWithImage('🦀 BẦU CUA CÁ TÔM\nCu phap: !baucua <bau|của|tom|ca|ga|nai> <cược>\nVd: !baucua cua 10k\nVd: !baucua tom 200');
       return;
     }
     const choice = normalize(parts[1]);
@@ -1094,9 +1132,9 @@ function handleCommand(api, event) {
     if (count > 0) qmsg2 += addQuestProgress(u, 'win', 1);
     saveData();
 
-    let msg = `🦀 BẦU CUA CÁ TÔM\nXuc xac: ${dice.map(d => icons[d]).join(' - ')}\nBan cược: ${icons[choice]} ${bet} VNĐ\n`;
-    msg += count === 0 ? `😢 Không trúng con nao! Mat ${bet} VNĐ\n💰 Số dư: ${u.balance} VNĐ`
-      : `🎉 Trúng ${count} con! Nhận ${payout} VNĐ\n💰 Số dư: ${u.balance} VNĐ`;
+    let msg = `🦀 BẦU CUA CÁ TÔM\nXuc xac: ${dice.map(d => icons[d]).join(' - ')}\nBan cược: ${icons[choice]} ${formatVnd(bet)}\n`;
+    msg += count === 0 ? `😢 Không trúng con nao! Mat ${formatVnd(bet)}\n💰 Số dư: ${formatVnd(u.balance)}`
+      : `🎉 Trúng ${count} con! Nhận ${formatVnd(payout)}\n💰 Số dư: ${formatVnd(u.balance)}`;
     sendWithImage(msg);
     return;
   }

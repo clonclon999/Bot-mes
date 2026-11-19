@@ -182,3 +182,11 @@ Bản vendored `0.4.0-botmes.1` thử luân phiên `edge-chat.facebook.com` và 
 
 ### MQTT stability botmes.2
 Loại bỏ reconnect sai sau 45 giây không có tin nhắn; dùng MQTT keepalive + foreground heartbeat 25 giây, chỉ reconnect khi socket thật sự mất kết nối; phản hồi lệnh dùng noAck để không kẹt hàng đợi.
+
+
+## Giao diện kinh tế kiểu Bot-dis-spam
+
+- Tiền luôn hiển thị có dấu chấm: `100.000 VNĐ`, `1.000.000 VNĐ`.
+- Các lệnh cược/chuyển/lì xì/admin give hỗ trợ `10k`, `1,5tr`, `1m`, `1ty`, `all/max/tất tay`, `half/nửa`, ngoài số thường và số có dấu chấm.
+- Ví dụ: `!taixiu tai 10k`, `!slot 50k`, `!bank 1tr @tên`.
+- Các bảng ví, daily, work và level dùng khung chữ/emoji; level có thanh tiến trình. Messenger không hỗ trợ Discord Embed/Button nên giao diện được tối ưu bằng Unicode.
