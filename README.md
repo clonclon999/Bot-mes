@@ -200,3 +200,7 @@ Ba game cược chung theo nhóm, mở vòng bằng lệnh riêng và khóa cư�
 - `!lotto start` → mọi người cược `!lotto 69 10k`.
 
 Mỗi người có một vé cược mỗi vòng và có thể đổi cửa/tiền trước khi hết giờ; cược cũ được hoàn rồi thay bằng cược mới. Hết 45 giây bot dùng một kết quả chung, công bố danh sách thắng/thua và cập nhật tiền/EXP/nhiệm vụ cho tất cả. Quiz, phản xạ và lì xì vốn đã là game tranh nhanh nhiều người. Câu cá, farm, slot, đoán số và triệu phú giữ dạng cá nhân vì bản chất game là tiến trình riêng.
+
+### Hiệu ứng Bầu Cua trên Messenger
+
+Khi vòng Bầu Cua 45 giây khóa cược, bot gửi `baucua_roll.gif` (hiệu ứng rung/xóc khoảng 2,6 giây), sau đó mới gửi ảnh bàn cùng kết quả chung và danh sách thắng/thua. Messenger hỗ trợ phát GIF nhưng không hỗ trợ Discord Embed/Button/animation component, nên đây là hiệu ứng ảnh động gửi trong chat.

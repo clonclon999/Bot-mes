@@ -5,7 +5,7 @@
  * CANH BAO: Day la API không chinh thuc, vi pham dieu khoan Meta.
  * Chỉ đúng acc phu, không đúng acc chinh. Co the bi khóa / checkpoint.
  *
- * Len h co san (chỉ trả lời khi nhận !):
+ * Lệnh có sẵn (chỉ trả lời khi nhận !):
  *  !help / !menu  - Danh sach lệnh
  *  !hi            - Chào hỏi
  *  !ping          - Kiểm tra bot
@@ -16,10 +16,10 @@
  *  --- TRÒ CHƠI TIỀN ẢO VND (giải trí, không dùng tiền thật) ---
  *  !balance       - Xem số dư VNĐ
  *  !daily         - Nhận 50.000 VNĐ mỗi ngày
- *  !diemdanh      - Điểm danh nhận tiền theo streak
+ *  !diemdanh      - Điểm danh nhận tiền theo chuỗi
  *  !work          - Làm việc nhận VNĐ (cooldown 60s)
  *  !fish          - Đi câu cá (cooldown 120s)
- *  !farm          - Trồng cây thứ hoach (cooldown 180s)
+ *  !farm          - Trồng cây thu hoạch (cooldown 180s)
  *  !bank <tiền> @tên - Chuyển tiền cho người khác
  *  !taixiu <tai|xiu|so> <cược>  - Vd: !taixiu tai 10k
  *  !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua cua 10k
@@ -27,25 +27,25 @@
  *  !lotto <so 00-99> <cược> - Xổ số: !lotto 69 10k
  *  !lixi <tiền>   - Thả lì xì, người khác gõ !nhận để nhận
  *  !quiz          - Do vui có thưởng (trả lời đúng đầu tiên được tiền)
- *  !soicau        - Xem lịch sử + thống kê Tai/Xiu (chỉ thống kê, không đủ đoán được kết quả thật)
+ *  !soicau        - Xem lịch sử + thống kê Tài/Xỉu (chỉ thống kê, không đủ đoán được kết quả thật)
  *  !top           - Bang xếp hạng dai gia
  *  !level / !rank - Xem cấp độ / xếp hạng cấp độ
  *  !quest         - Nhiệm vụ hàng ngày
- *  !guess <so>    - Đoán so 1-100
- *  !reaction      - Game phản xạ: ai go !go nhanh nhất được tiền
+ *  !guess <số>    - Đoán số 1-100
+ *  !reaction      - Gàme phản xạ: ai gõ !go nhanh nhất được tiền
  *  !trieuphu      - Ai là triệu phú: trả lời 5 câu liên tiếp
- *  --- ADMIN (chỉ admin mới đúng được, go !adminhelp) ---
+ *  --- ADMIN (chỉ admin mới dùng được, gõ !adminhelp) ---
  *  !addadmin / !deladmin / !admins - Quản lý admin
  *  !kick / !bạn / !unban / !mute / !unmute / !warn - Dieu hanh thành viên
  *  !give / !reset - Tặng / reset tiền
  *  !stats / !settitle / !color / !emoji - Thong ke & tuy chinh nhóm
  *
- * Chong spam / do bi Facebook quet + chay nhé tren goi free Botkeep:
- *  - Chỉ trả lời lệnh có dấu !, cooldown moi lệnh, delay ngẫu nhiên giong người
- *  - Không tu nhận trước, không spam tin, gioi han lịch sử, không nang
+ * Chong spam / do bị Facebook quét + chay nhé tren goi free Botkeep:
+ *  - Chỉ trả lời lệnh có dấu !, hồi chiêu mỗi lệnh, delay ngẫu nhiên giống người
+ *  - Không tự nhắn trước, không spam tin, giới hạn lịch sử, không nặng
  */
 
-require('dotenv').config(); // Botkeep ghi bien moi truong vao file .env, phải load file nay
+require('dotenv').config(); // Botkeep ghi biến môi trường vao file .env, phải load file này
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -58,15 +58,15 @@ healthApp.listen(PORT, '0.0.0.0', () => console.log(`🌐 Health-check tren port
 
 // ===== LAY THONG TIN DANG NHAP =====
 function getCredentials() {
-  // Cach 1: APPSTATE từ biến moi truong (khuyen đúng tren Botkeep)
+  // Cách 1: APPSTATE từ biến mới truong (khuyên dùng trên Botkeep)
   if (process.env.APPSTATE) {
     try {
       let raw = String(process.env.APPSTATE).trim();
-      // Fix lỗi hãy gap: Botkeep ghi .env lam hong JSON nhiều dong / co \n \t
+      // Fix lỗi hãy gap: Botkeep ghi .env làm hỏng JSON nhiều dòng / co \n \t
       raw = raw.replace(/\\n/g, ' ').replace(/\\t/g, ' ').replace(/\\r/g, ' ');
       // Neu JSON bi escape qua (\" thay vi "), sua lại
       if (raw.includes('\\"')) raw = raw.replace(/\\"/g, '"');
-      // Chỉ lay phan tu [ đầu tiên đến ] cuoi cung (bo chu thua o ngoai)
+      // Chỉ lấy phần từ [ đầu tiên đến ] cuối cùng (bỏ chữ thừa ở ngoài)
       const startIdx = raw.indexOf('[');
       const endIdx = raw.lastIndexOf(']');
       if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
@@ -78,11 +78,11 @@ function getCredentials() {
       return { appState: parsed };
     } catch (e) {
       console.error('❌ APPSTATE không phải JSON hop le:', e.message);
-      console.error('💡 Hãy dan APPSTATE đang 1 dong duy nhat (compact JSON), bắt đầu bang [ va ket thuc bang ], đúng dan nhiều dong.');
+      console.error('💡 Hãy dán APPSTATE dạng 1 dòng duy nhất (compact JSON), bắt đầu bằng [ và kết thúc bằng ], đừng dán nhiều dòng.');
     }
   }
 
-  // Cach 1b: file appstate.json o may (chay local)
+  // Cách 1b: file appstate.json ở máy (chạy local)
   const filePath = path.join(__dirname, 'appstate.json');
   if (fs.existsSync(filePath)) {
     try {
@@ -94,7 +94,7 @@ function getCredentials() {
     }
   }
 
-  // Cach 2: Email / mất khau
+  // Cách 2: Email / mật khẩu
   if (process.env.FB_EMAIL && process.env.FB_PASSWORD) {
     console.log('🔑 Đăng nhập bang Email/Password');
     const creds = { email: process.env.FB_EMAIL, password: process.env.FB_PASSWORD };
@@ -102,20 +102,20 @@ function getCredentials() {
     return creds;
   }
 
-  console.error('❌ Chưa co thông tin đăng nhập! Hãy thêm APPSTATE hoặc FB_EMAIL/FB_PASSWORD vao Environment tren Botkeep.');
+  console.error('❌ Chưa có thông tin đăng nhập! Hãy thêm APPSTATE hoặc FB_EMAIL/FB_PASSWORD vào Environment trên Botkeep.');
   process.exit(1);
 }
 
 // ===== XU LY LENH =====
 const JOKES = [
-  '😂 Tai sao lap trinh vien hãy nham Halloween với Giang sinh? Vi OCT 31 == DEC 25!',
+  '😂 Tại sao lập trình viên hay nhầm Halloween với Giáng sinh? Vì OCT 31 == DEC 25!',
   '🤣 Co 10 loai người tren đổi: người hieu nhi phan va người không hieu.',
-  '😆 Debug la qua trinh loai bo bug... bang cach thêm bug moi vao!',
+  '😆 Debug là quá trình loại bỏ bug... bằng cách thêm bug mới vào!',
   '🙃 Lap trinh vien không chet vi code, ho chet vi... "chỉ sua 1 dong thôi" rồi sua ca ngày!',
 ];
 
 // ===== HE THONG XU AO + TRO CHOI =====
-// Lưu ý: Chỉ đúng tiền ao VNĐ để giải trí trong nhóm, KHONG đúng tiền thật, KHONG đúng để chơi co bac thật.
+// Lưu ý: Chỉ dùng tiền ảo VNĐ để giải trí trong nhóm, KHÔNG dùng tiền thật, KHÔNG dùng để chơi cờ bạc thật.
 const START_BALANCE = 100000; // 100.000 VNĐ
 const DAILY_REWARD = 50000; // 50.000 VNĐ
 const DATA_FILE = path.join(__dirname, 'data.json');
@@ -155,7 +155,7 @@ const TRIEUPHU_QUESTIONS = [
   { q: 'Ngày le Quoc khanh Viet Nam la ngày may?', a: '2/9' },
   { q: 'Con gi leo cay va an chuoi dai?', a: 'khoi' },
   { q: 'Hanh tinh gan mất nhat la?', a: 'sao kim' },
-  { q: 'Con so đầu tiên trong day so tu nhien la?', a: '0' },
+  { q: 'Con so đầu tiên trong day số từ nhien la?', a: '0' },
   { q: 'Con gi co 2 chan va biet bay?', a: 'chim' },
   { q: 'Nuoc nao co thap Eiffel?', a: 'phap' },
 ];
@@ -164,7 +164,7 @@ const expCooldowns = {}; // senderID -> timestamp (chong farm EXP)
 
 const QUEST_POOL = [
   { type: 'taixiu', desc: 'Chơi 3 ván Tài Xỉu', target: 3, reward: 30000 },
-  { type: 'baucua', desc: 'Choi 2 ván Bau Cua', target: 2, reward: 30000 },
+  { type: 'baucua', desc: 'Chơi 2 ván Bầu Cua', target: 2, reward: 30000 },
   { type: 'slot', desc: 'Quay xeng 2 lần', target: 2, reward: 25000 },
   { type: 'fish', desc: 'Đi câu cá 1 lần', target: 1, reward: 20000 },
   { type: 'work', desc: 'Làm việc 2 lần', target: 2, reward: 25000 },
@@ -172,7 +172,7 @@ const QUEST_POOL = [
   { type: 'win', desc: 'Thắng 1 ván bat ky', target: 1, reward: 30000 },
   { type: 'quiz', desc: 'Trả lời đúng 1 câu do vui', target: 1, reward: 25000 },
   { type: 'lixi', desc: 'Nhận lì xì 1 lần', target: 1, reward: 20000 },
-  { type: 'lotto', desc: 'Choi xo so 1 lần', target: 1, reward: 20000 },
+  { type: 'lotto', desc: 'Chơi xổ số 1 lần', target: 1, reward: 20000 },
 ];
 
 const QUIZ_QUESTIONS = [
@@ -218,7 +218,7 @@ function isAdmin(id) {
 }
 loadData();
 
-// Admin co dinh qua bien moi truong ADMIN_IDS (không can go lệnh trong nhóm)
+// Admin cố định qua biến môi trường ADMIN_IDS (không cần gõ lệnh trong nhóm)
 // Vi du tren Botkeep: ADMIN_IDS=1234567890123,9876543210987
 if (process.env.ADMIN_IDS || process.env.ADMIN_ID) {
   const envAdmins = (process.env.ADMIN_IDS || process.env.ADMIN_ID).split(',').map(s => s.trim()).filter(Boolean);
@@ -233,7 +233,7 @@ function getUser(id) {
     users[id] = { balance: START_BALANCE, lastDaily: 0, lastWork: 0, wins: 0, losses: 0, lastCheckin: 0, streak: 0, banned: false, mutedUntil: 0, warns: 0, exp: 0, level: 1, quests: null };
     saveData();
   }
-  // migrate user cu thieu truong moi
+  // migrate user cu thieu truong mới
   if (users[id].lastCheckin === undefined) users[id].lastCheckin = 0;
   if (users[id].streak === undefined) users[id].streak = 0;
   if (users[id].banned === undefined) users[id].banned = false;
@@ -254,7 +254,7 @@ function addExp(user, amount) {
     const bonus = user.level * 10000;
     user.balance += bonus;
     need = user.level * 100;
-    // tra về thong báo len cấp qua reply o ngoai neu can, o day chỉ cong tiền
+    // tra về thong báo len cấp qua reply ở ngoài neu can, o day chỉ cong tiền
     user._levelUpBonus = (user._levelUpBonus || 0) + bonus;
   }
 }
@@ -349,9 +349,9 @@ function parseBet(args, user) {
   return { bet };
 }
 
-function sendRoundMessage(api, threadID, body, withBaucuaImage = false) {
+function sendRoundMessage(api, threadID, body, withBầucuaImage = false) {
   const msg = { body, noAck: true };
-  if (withBaucuaImage) {
+  if (withBầucuaImage) {
     const img = path.join(__dirname, 'baucua.jpg');
     if (fs.existsSync(img)) msg.attachment = fs.createReadStream(img);
   }
@@ -382,6 +382,19 @@ function openMultiplayerRound(game, api, threadID) {
 function settleMultiplayerRound(game, threadID) {
   const round = multiplayerRounds[game][threadID];
   if (!round) return;
+
+  // Messenger hỗ trợ GIF: phát hiệu ứng xóc trước, sau đó mới công bố kết quả.
+  if (game === 'baucua' && !round.animationPlayed && round.bets.size > 0) {
+    round.animationPlayed = true;
+    clearTimeout(round.timer);
+    const gif = path.join(__dirname, 'baucua_roll.gif');
+    const loading = { body: '🎲 ĐANG XÓC BẦU CUA... Kết quả sắp có!', noAck: true };
+    if (fs.existsSync(gif)) loading.attachment = fs.createReadStream(gif);
+    round.api.sendMessage(loading, threadID, err => err && console.error('❌ Lỗi gửi GIF Bầu Cua:', err.message || err));
+    round.timer = setTimeout(() => settleMultiplayerRound(game, threadID), 2600);
+    return;
+  }
+
   delete multiplayerRounds[game][threadID];
   clearTimeout(round.timer);
   if (!round.bets.size) {
@@ -498,7 +511,7 @@ function handleCommand(api, event) {
   const threadID = event.threadID;
   const senderID = event.senderID;
 
-  // Chong spam / giong người: delay ngẫu nhiên 400-1000ms + typing indicator
+  // Chong spam / giống người: delay ngẫu nhiên 400-1000ms + typing indicator
   const reply = (msg) => {
     const delay = 400 + Math.floor(Math.random() * 601);
     try { if (api.sendTypingIndicator) api.sendTypingIndicator(threadID); } catch (e) {}
@@ -543,12 +556,12 @@ function handleCommand(api, event) {
   }
 
   if (lower === '!help' || lower === '!menu' || lower === 'menu') {
-    reply('🤖 DANH SACH LENH:\n\n' +
+    reply('🤖 DANH SÁCH LỆNH:\n\n' +
       '• !hi - Chào hỏi\n• !ping - Kiểm tra bot\n• !time / !giờ - Xem giờ\n' +
       '• !echo <text> - Lặp lại\n• !joke - Chuyện cười\n• !info - Thông tin bot\n\n' +
       '🎮 TRÒ CHƠI TIỀN ẢO VND (giải trí, không dùng tiền thật):\n' +
-      '• !balance - Xem số dư\n• !daily - Nhận 50.000 VNĐ mỗi ngày\n• !diemdanh - Điểm danh theo streak\n• !work - Làm việc nhận VNĐ\n' +
-      '• !fish - Đi câu cá\n• !farm - Trồng cây thứ hoach\n' +
+      '• !balance - Xem số dư\n• !daily - Nhận 50.000 VNĐ mỗi ngày\n• !diemdanh - Điểm danh theo chuỗi\n• !work - Làm việc nhận VNĐ\n' +
+      '• !fish - Đi câu cá\n• !farm - Trồng cây thu hoạch\n' +
       '• !bank <số tiền> @tên - Chuyển tiền cho người khác\n' +
       '  Vd: !bank 50k @TenBan\n' +
       '• !taixiu start - Mở vòng chung 45s; cược: !taixiu tai 10k\n' +
@@ -557,11 +570,11 @@ function handleCommand(api, event) {
       '• !lotto start - Mở vòng chung 45s; cược: !lotto 69 10k\n' +
       '• !lixi <tiền> - Thả lì xì, người khác gõ !nhận để nhận\n' +
       '• !quiz - Do vui có thưởng (trả lời đúng đầu tiên)\n' +
-      '• !soicau - Xem lịch sử Tai/Xiu\n• !top - Đại gia nhất nhóm\n' +
-      '• !level - Xem cấp độ của bạn\n• !rank - Xếp hạng cấp độ\n• !quest - Nhiệm vụ hàng ngày\n• !guess <so> - Đoán so 1-100\n' +
-      '• !reaction - Game phản xạ, ai go !go nhanh nhất\n• !trieuphu - Ai là triệu phú 5 câu\n\n' +
+      '• !soicau - Xem lịch sử Tài/Xỉu\n• !top - Đại gia nhất nhóm\n' +
+      '• !level - Xem cấp độ của bạn\n• !rank - Xếp hạng cấp độ\n• !quest - Nhiệm vụ hàng ngày\n• !guess <số> - Đoán số 1-100\n' +
+      '• !reaction - Gàme phản xạ, ai gõ !go nhanh nhất\n• !trieuphu - Ai là triệu phú 5 câu\n\n' +
       '💡 NHẬP TIỀN NHANH: 10k = 10.000 | 1tr = 1.000.000 | all = tất tay | half = nửa số dư\n\n' +
-      'Bot chỉ trả lời khi có dấu ! để tránh spam nhóm.\nAdmin go !adminhelp để xem lệnh quản trị.');
+      'Bot chỉ trả lời khi có dấu ! để tránh spam nhóm.\nAdmin gõ !adminhelp để xem lệnh quản trị.');
     return;
   }
   if (lower === '!hi' || lower === 'hi' || lower === 'hello') {
@@ -569,7 +582,7 @@ function handleCommand(api, event) {
     return;
   }
   if (lower === '!id' || lower === '!myid' || lower === '!uid') {
-    reply(`🪪 ID của bạn la: ${senderID}\nCopy ID nay dan vao bien ADMIN_IDS tren Botkeep để lam admin vinh vien, không can go lệnh trong nhóm.`);
+    reply(`🪪 ID của bạn là: ${senderID}\nCopy ID này dán vào biến ADMIN_IDS tren Botkeep để làm admin vĩnh viễn, không cần gõ lệnh trong nhóm.`);
     return;
   }
   if (lower === '!ping') {
@@ -618,7 +631,7 @@ function handleCommand(api, event) {
   if (lower === '!work') {
     const u = getUser(senderID);
     const cd = checkCooldown(senderID + '_work', 60);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi làm việc được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới làm việc được.`); return; }
     const earn = 5000 + Math.floor(Math.random() * 15001); // 5.000 - 20.000 VNĐ
     u.balance += earn;
     addExp(u, 5);
@@ -629,7 +642,7 @@ function handleCommand(api, event) {
   }
   if (lower === '!top') {
     const sorted = Object.entries(users).sort((a, b) => b[1].balance - a[1].balance).slice(0, 10);
-    if (!sorted.length) { reply('Chưa co ai chơi. Go !daily để nhận VNĐ đầu tiên!'); return; }
+    if (!sorted.length) { reply('Chưa có ai chơi. Gõ !daily để nhận VNĐ đầu tiên!'); return; }
     let msg = '🏆 BANG XEP HANG DAI GIA:\n\n';
     sorted.forEach(([id, u], i) => { msg += `${i + 1}. ${id.slice(-6)}... - ${formatVnd(u.balance)}\n`; });
     reply(msg);
@@ -639,7 +652,7 @@ function handleCommand(api, event) {
   // ===== BANK / CHUYEN TIEN =====
   if (lower.startsWith('!bank') || lower.startsWith('!chuyển') || lower.startsWith('!pay') || lower.startsWith('!transfer')) {
     const cd = checkCooldown(senderID + '_bank', 5);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chuyển được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới chuyển được.`); return; }
     const parts = text.split(/\s+/);
 
     // Lay người nhận: uu tiền mention, sau do đến ID so trong tin nhắn
@@ -662,7 +675,7 @@ function handleCommand(api, event) {
     }
 
     if (!recipientID) {
-      reply('Cu phap: !bank <số tiền> @tên\nVd: !bank 50k @TenBan\n(Hãy @ tên người nhận trong tin nhắn)');
+      reply('Cú pháp: !bank <số tiền> @tên\nVd: !bank 50k @TenBan\n(Hãy @ tên người nhận trong tin nhắn)');
       return;
     }
     if (!amount || amount <= 0) {
@@ -670,7 +683,7 @@ function handleCommand(api, event) {
       return;
     }
     if (recipientID === String(senderID)) {
-      reply('Không the tu chuyển tiền cho chính mình dau!');
+      reply('Không thể tự chuyển tiền cho chính mình đâu!');
       return;
     }
     const sender = getUser(senderID);
@@ -716,7 +729,7 @@ function handleCommand(api, event) {
   // ===== CAU CA / TRONG CAY =====
   if (lower === '!fish' || lower === '!cauca') {
     const cd = checkCooldown(senderID + '_fish', 120);
-    if (cd > 0) { reply(`🎣 Cho ${Math.ceil(cd / 60)} phút nữa moi câu được.`); return; }
+    if (cd > 0) { reply(`🎣 Cho ${Math.ceil(cd / 60)} phút nữa mới câu được.`); return; }
     const u = getUser(senderID);
     const r = Math.random();
     let earn = 0, msg = '🎣 Bạn đã đi câu cá...\n';
@@ -734,11 +747,11 @@ function handleCommand(api, event) {
   }
   if (lower === '!farm' || lower === '!trongcay') {
     const cd = checkCooldown(senderID + '_farm', 180);
-    if (cd > 0) { reply(`🌱 Cho ${Math.ceil(cd / 60)} phút nữa moi thứ hoach được.`); return; }
+    if (cd > 0) { reply(`🌱 Cho ${Math.ceil(cd / 60)} phút nữa mới thu hoạch được.`); return; }
     const u = getUser(senderID);
     const r = Math.random();
     let earn = 0, msg = '🌱 Bạn đã thu hoạch vườn cây...\n';
-    if (r < 0.2) { msg += '🥀 Cay bi sau an, mất trang!'; }
+    if (r < 0.2) { msg += '🥀 Cây bị sâu ăn, mất trắng!'; }
     else if (r < 0.75) { earn = 10000 + Math.floor(Math.random() * 20001); msg += `🍚 Thu hoạch lúa/rau! +${formatVnd(earn)}`; }
     else { earn = 40000 + Math.floor(Math.random() * 60001); msg += `🍉 Thu hoạch được quả ngon! +${formatVnd(earn)}`; }
     u.balance += earn;
@@ -751,9 +764,9 @@ function handleCommand(api, event) {
   // ===== QUAY XÈNG =====
   if (lower.startsWith('!slot')) {
     const cd = checkCooldown(senderID, 5);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi quay được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới quay được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 2) { reply('Cu phap: !slot <cược>\nVd: !slot 10k'); return; }
+    if (parts.length < 2) { reply('Cú pháp: !slot <cược>\nVd: !slot 10k'); return; }
     const { bet, error } = parseBet(parts, getUser(senderID));
     if (error) { reply(error); return; }
     const u = getUser(senderID);
@@ -784,11 +797,11 @@ function handleCommand(api, event) {
   // ===== XỔ SỐ =====
   if (lower.startsWith('!lotto')) {
     const cd = checkCooldown(senderID, 5);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới chơi được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 3) { reply('Cu phap: !lotto <so 00-99> <cược>\nVd: !lotto 69 10k'); return; }
+    if (parts.length < 3) { reply('Cú pháp: !lotto <so 00-99> <cược>\nVd: !lotto 69 10k'); return; }
     const guess = parseInt(parts[1], 10);
-    if (isNaN(guess) || guess < 0 || guess > 99) { reply('So phải tu 00 đến 99.'); return; }
+    if (isNaN(guess) || guess < 0 || guess > 99) { reply('Số phải từ 00 đến 99.'); return; }
     const { bet, error } = parseBet(parts, getUser(senderID));
     if (error) { reply(error); return; }
     const u = getUser(senderID);
@@ -822,7 +835,7 @@ function handleCommand(api, event) {
     const u = getUser(senderID);
     if (amount > u.balance) { reply(`Không đủ VNĐ! Số dư: ${formatVnd(u.balance)}`); return; }
     if (activeLixi[threadID] && Date.now() < activeLixi[threadID].expiresAt) {
-      reply('Da co lì xì đang cho, cho người ta nhận xong hoặc hết hạn moi tha tiếp.');
+      reply('Đã có lì xì đang chờ, cho người ta nhận xong hoặc hết hạn mới thả tiếp.');
       return;
     }
     u.balance -= amount;
@@ -833,8 +846,8 @@ function handleCommand(api, event) {
   }
   if (lower === '!nhận') {
     const lixi = activeLixi[threadID];
-    if (!lixi || Date.now() > lixi.expiresAt) { reply('Không co lì xì nao đang cho.'); return; }
-    if (String(lixi.creatorID) === String(senderID)) { reply('Bạn la người tha lì xì, không the tu nhận dau!'); return; }
+    if (!lixi || Date.now() > lixi.expiresAt) { reply('Không có lì xì nào đang chờ.'); return; }
+    if (String(lixi.creatorID) === String(senderID)) { reply('Bạn là người thả lì xì, không thể tự nhận đâu!'); return; }
     const u = getUser(senderID);
     u.balance += lixi.amount;
     addExp(u, 5);
@@ -848,13 +861,13 @@ function handleCommand(api, event) {
   // ===== DO VUI / QUIZ =====
   if (lower === '!quiz') {
     if (activeQuiz[threadID] && Date.now() < activeQuiz[threadID].expiresAt) {
-      reply('Da co câu hỏi đang cho, trả lời đúng để nhận thưởng nhé!');
+      reply('Đã có câu hỏi đang chờ, trả lời đúng để nhận thưởng nhé!');
       return;
     }
     const q = QUIZ_QUESTIONS[Math.floor(Math.random() * QUIZ_QUESTIONS.length)];
     const reward = 20000;
     activeQuiz[threadID] = { question: q.q, answer: normalize(q.a), reward, expiresAt: Date.now() + 60000 };
-    reply(`🧠 ĐỐ VUI CÓ THƯỞNG ${formatVnd(reward)}!\n${q.q}\nTrả lời đúng đầu tiên (go đáp án, không cần dấu !) se được thưởng! (60s)`);
+    reply(`🧠 ĐỐ VUI CÓ THƯỞNG ${formatVnd(reward)}!\n${q.q}\nTrả lời đúng đầu tiên (go đáp án, không cần dấu !) sẽ được thưởng! (60s)`);
     return;
   }
   // Kiểm tra trả lời quiz (tin nhắn không có dấu !)
@@ -894,22 +907,22 @@ function handleCommand(api, event) {
       '• !kick @tên - Kick khỏi nhóm (neu bot la admin nhóm)\n' +
       '• !bạn @tên / !unban @tên - Cấm bot / Go cấm\n' +
       '• !mute @tên <phút> / !unmute @tên - Tắt tiếng tam thôi\n' +
-      '• !warn @tên - Canh cao (3 lần = mute 10 phút)\n' +
+      '• !warn @tên - Cảnh cáo (3 lần = mute 10 phút)\n' +
       '• !give @tên <tiền> - Tặng tiền\n• !reset @tên - Reset tiền về 100.000\n' +
-      '• !stats - Thong ke nhóm\n• !settitle <tên moi> - Doi tên nhóm\n' +
-      '• !color <ma màu> - Doi màu nhóm (vd: !color #FF0000)\n' +
+      '• !stats - Thong ke nhóm\n• !settitle <tên mới> - Doi tên nhóm\n' +
+      '• !color <mã màu> - Doi màu nhóm (vd: !color #FF0000)\n' +
       '• !emoji <emoji> - Doi emoji nhóm');
     return;
   }
   if (lower === '!admins') {
-    if (!admins.length) { reply('Chưa co admin nao. Hãy thêm admin qua bien ADMIN_IDS tren Botkeep (go !id để lay ID).'); return; }
+    if (!admins.length) { reply('Chưa có admin nào. Hãy thêm admin qua biến ADMIN_IDS tren Botkeep (gõ !id để lấy ID).'); return; }
     reply('🛡️ DANH SACH ADMIN:\n' + admins.map(id => '• ...' + String(id).slice(-6)).join('\n'));
     return;
   }
   if (lower.startsWith('!addadmin')) {
-    if (!isSenderAdmin) { reply('Chỉ admin mới thêm được admin. Admin đầu tiên phải thêm qua bien ADMIN_IDS tren Botkeep.'); return; }
+    if (!isSenderAdmin) { reply('Chỉ admin mới thêm được admin. Admin đầu tiên phải thêm qua biến ADMIN_IDS tren Botkeep.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !addadmin @tên'); return; }
+    if (!target) { reply('Cú pháp: !addadmin @tên'); return; }
     if (isAdmin(target)) { reply('Người này đã là admin rồi.'); return; }
     admins.push(String(target));
     saveData();
@@ -919,17 +932,17 @@ function handleCommand(api, event) {
   if (lower.startsWith('!deladmin')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới xóa được admin.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !deladmin @tên'); return; }
+    if (!target) { reply('Cú pháp: !deladmin @tên'); return; }
     admins = admins.filter(id => String(id) !== String(target));
     saveData();
-    reply(`Da xóa admin: ${getMentionName() || ('...' + String(target).slice(-6))}`);
+    reply(`Đã xóa admin: ${getMentionName() || ('...' + String(target).slice(-6))}`);
     return;
   }
   if (lower.startsWith('!kick')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới kick được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !kick @tên'); return; }
-    if (String(target) === String(senderID)) { reply('Không the tu kick chính mình!'); return; }
+    if (!target) { reply('Cú pháp: !kick @tên'); return; }
+    if (String(target) === String(senderID)) { reply('Không thể tự kick chính mình!'); return; }
     // Thu kick thật khỏi nhóm neu API ho tro, dong thôi bạn khỏi bot
     getUser(target).banned = true;
     saveData();
@@ -946,16 +959,16 @@ function handleCommand(api, event) {
   if (lower.startsWith('!bạn')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới bạn được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !bạn @tên'); return; }
+    if (!target) { reply('Cú pháp: !bạn @tên'); return; }
     getUser(target).banned = true;
     saveData();
     reply(`🚫 Đã cấm ${getMentionName() || ('...' + String(target).slice(-6))} khỏi bot.`);
     return;
   }
   if (lower.startsWith('!unban')) {
-    if (!isSenderAdmin) { reply('Chỉ admin mới go bạn được.'); return; }
+    if (!isSenderAdmin) { reply('Chỉ admin mới gỡ cấm được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !unban @tên'); return; }
+    if (!target) { reply('Cú pháp: !unban @tên'); return; }
     getUser(target).banned = false;
     saveData();
     reply(`✅ Đã gỡ cấm ${getMentionName() || ('...' + String(target).slice(-6))}`);
@@ -964,7 +977,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!mute')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới mute được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !mute @tên <phút>\nVd: !mute @TenBan 5'); return; }
+    if (!target) { reply('Cú pháp: !mute @tên <phút>\nVd: !mute @TenBan 5'); return; }
     const parts = text.split(/\s+/);
     let minutes = 5;
     for (const part of parts) { const n = parseInt(part, 10); if (!isNaN(n) && n > 0 && n < 10080) { minutes = n; break; } }
@@ -976,7 +989,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!unmute')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới unmute được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !unmute @tên'); return; }
+    if (!target) { reply('Cú pháp: !unmute @tên'); return; }
     getUser(target).mutedUntil = 0;
     saveData();
     reply(`🔊 Đã bỏ tắt tiếng ${getMentionName() || ('...' + String(target).slice(-6))}`);
@@ -985,7 +998,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!warn')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới warn được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !warn @tên'); return; }
+    if (!target) { reply('Cú pháp: !warn @tên'); return; }
     const tu = getUser(target);
     tu.warns += 1;
     let msg = `⚠️ Đã cảnh cáo ${getMentionName() || ('...' + String(target).slice(-6))} lần ${tu.warns}/3`;
@@ -1001,7 +1014,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!give')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới tặng tiền được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !give @tên <tiền>\nVd: !give @TenBan 50000'); return; }
+    if (!target) { reply('Cú pháp: !give @tên <tiền>\nVd: !give @TenBan 50000'); return; }
     const parts = text.split(/\s+/);
     let amount = null;
     for (const part of parts) { const n = parseAmountInput(part); if (n > 0) { amount = n; break; } }
@@ -1014,7 +1027,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!reset')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới reset được.'); return; }
     const target = getMentionID();
-    if (!target) { reply('Cu phap: !reset @tên'); return; }
+    if (!target) { reply('Cú pháp: !reset @tên'); return; }
     getUser(target).balance = START_BALANCE;
     saveData();
     reply(`🔄 Đã đặt lại tiền của ${getMentionName() || ('...' + String(target).slice(-6))} về ${formatVnd(START_BALANCE)}`);
@@ -1031,7 +1044,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!settitle')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới đổi tên nhóm được.'); return; }
     const newTitle = text.slice(10).trim();
-    if (!newTitle) { reply('Cu phap: !settitle <tên moi>'); return; }
+    if (!newTitle) { reply('Cú pháp: !settitle <tên mới>'); return; }
     if (api.setTitle) {
       api.setTitle(newTitle, threadID, (err) => {
         reply(err ? `Không đổi được tên nhóm: ${err.message || err}` : `✅ Đã đổi tên nhóm thành: ${newTitle}`);
@@ -1044,10 +1057,10 @@ function handleCommand(api, event) {
   if (lower.startsWith('!color')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới đổi màu được.'); return; }
     const color = text.slice(6).trim();
-    if (!color) { reply('Cu phap: !color <ma màu>\nVd: !color #FF0000'); return; }
+    if (!color) { reply('Cú pháp: !color <mã màu>\nVd: !color #FF0000'); return; }
     if (api.changeThreadColor) {
       api.changeThreadColor(color, threadID, (err) => {
-        reply(err ? `Không đổi được màu: ${err.message || err}` : `🎨 Đã đổi màu nhóm thanh ${color}`);
+        reply(err ? `Không đổi được màu: ${err.message || err}` : `🎨 Đã đổi màu nhóm thành ${color}`);
       });
     } else {
       reply('Bot không ho tro đổi màu nhóm.');
@@ -1057,10 +1070,10 @@ function handleCommand(api, event) {
   if (lower.startsWith('!emoji')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới đổi emoji được.'); return; }
     const emoji = text.slice(6).trim();
-    if (!emoji) { reply('Cu phap: !emoji <emoji>\nVd: !emoji 🔥'); return; }
+    if (!emoji) { reply('Cú pháp: !emoji <emoji>\nVd: !emoji 🔥'); return; }
     if (api.changeThreadEmoji) {
       api.changeThreadEmoji(emoji, threadID, (err) => {
-        reply(err ? `Không đổi được emoji: ${err.message || err}` : `✅ Đã đổi emoji nhóm thanh ${emoji}`);
+        reply(err ? `Không đổi được emoji: ${err.message || err}` : `✅ Đã đổi emoji nhóm thành ${emoji}`);
       });
     } else {
       reply('Bot không ho tro đổi emoji nhóm.');
@@ -1077,7 +1090,7 @@ function handleCommand(api, event) {
   }
   if (lower === '!rank') {
     const sorted = Object.entries(users).sort((a, b) => (b[1].level - a[1].level) || (b[1].exp - a[1].exp)).slice(0, 10);
-    if (!sorted.length) { reply('Chưa co ai co cấp độ.'); return; }
+    if (!sorted.length) { reply('Chưa có ai có cấp độ.'); return; }
     let msg = '⭐ BANG XEP HANG CAP DO:\n\n';
     sorted.forEach(([id, u], i) => { msg += `${i + 1}. ...${String(id).slice(-6)} - Cấp ${u.level} (${u.exp} EXP)\n`; });
     reply(msg);
@@ -1092,7 +1105,7 @@ function handleCommand(api, event) {
     quests.forEach((q, i) => {
       msg += `${q.done ? '✅' : '⬜'} ${i + 1}. ${q.desc} (${q.progress}/${q.target}) - ${formatVnd(q.reward)}\n`;
     });
-    msg += '\nLam nhiệm vụ để nhận tiền! Nhiệm vụ moi mỗi ngày.';
+    msg += '\nLàm nhiệm vụ để nhận tiền! Nhiệm vụ mới mỗi ngày.';
     reply(msg);
     return;
   }
@@ -1102,18 +1115,18 @@ function handleCommand(api, event) {
     const parts = text.split(/\s+/);
     if (parts.length < 2) {
       if (activeGuess[senderID]) {
-        reply(`🎯 Bạn đang đoán so 1-100. Đã đoán ${activeGuess[senderID].attempts} lần. Gõ !guess <so> để đoán tiếp!`);
+        reply(`🎯 Bạn đang đoán so 1-100. Đã đoán ${activeGuess[senderID].attempts} lần. Gõ !guess <số> để đoán tiếp!`);
       } else {
         activeGuess[senderID] = { number: 1 + Math.floor(Math.random() * 100), attempts: 0 };
-        reply('🎯 BAT DAU DOAN SO!\nMinh vua nghi 1 so tu 1 đến 100.\nGõ !guess <so> để đoán, vi du: !guess 50');
+        reply('🎯 BẮT ĐẦU ĐOÁN SỐ!\nMình vừa nghĩ 1 số từ 1 đến 100.\nGõ !guess <số> để đoán, ví dụ: !guess 50');
       }
       return;
     }
     const guess = parseInt(parts[1], 10);
-    if (isNaN(guess) || guess < 1 || guess > 100) { reply('So phải tu 1 đến 100.'); return; }
+    if (isNaN(guess) || guess < 1 || guess > 100) { reply('Số phải từ 1 đến 100.'); return; }
     if (!activeGuess[senderID]) {
       activeGuess[senderID] = { number: 1 + Math.floor(Math.random() * 100), attempts: 0 };
-      reply('🎯 Bắt đầu ván moi! Minh vua nghi 1 so tu 1 đến 100. Gõ !guess <so> để đoán!');
+      reply('🎯 Bắt đầu ván mới! Mình vừa nghĩ 1 số từ 1 đến 100. Gõ !guess <số> để đoán!');
       return;
     }
     const game = activeGuess[senderID];
@@ -1135,14 +1148,14 @@ function handleCommand(api, event) {
     return;
   }
 
-  // ===== GAME PHAN XA =====
+  // ===== GAME PHẢN XẠ =====
   if (lower === '!reaction') {
     if (activeReaction[threadID] && Date.now() < activeReaction[threadID].expiresAt) {
-      reply('Da co ván phản xạ đang cho, cho ván nay xong nhé!');
+      reply('Đã có ván phản xạ đang chờ, cho ván này xong nhé!');
       return;
     }
     activeReaction[threadID] = { state: 'waiting', goTime: 0, expiresAt: Date.now() + 15000 };
-    reply('⚡ GAME PHAN XA!\nSan sang chưa? Chờ xíu...\nKhi thay chu GO thi go !go thật nhanh!');
+    reply('⚡ GAME PHẢN XẠ!\nSẵn sàng chưa? Chờ xíu...\nKhi thấy chữ GO thì gõ !go thật nhanh!');
     const waitMs = 3000 + Math.floor(Math.random() * 4000); // 3-7s
     setTimeout(() => {
       if (!activeReaction[threadID] || activeReaction[threadID].state !== 'waiting') return;
@@ -1155,9 +1168,9 @@ function handleCommand(api, event) {
   }
   if (lower === '!go') {
     const game = activeReaction[threadID];
-    if (!game) { reply('Chưa co ván phản xạ nao. Go !reaction để bắt đầu!'); return; }
+    if (!game) { reply('Chưa có ván phản xạ nao. Gõ !reaction để bắt đầu!'); return; }
     if (game.state === 'waiting') {
-      reply('⏳ Chưa GO ma! Bạn go quá nhanh, bị loại ván nay!');
+      reply('⏳ Chưa GO mà! Bạn go quá nhanh, bị loại ván này!');
       delete activeReaction[threadID];
       return;
     }
@@ -1222,9 +1235,9 @@ function handleCommand(api, event) {
   // ===== TÀI XỈU =====
   if (lower.startsWith('!taixiu')) {
     const cd = checkCooldown(senderID, 3);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới chơi được.`); return; }
     const parts = text.split(/\s+/);
-    if (parts.length < 3) { reply('Cu phap: !taixiu <tai|xiu|so> <cược>\nVd: !taixiu tai 10k\nVd: !taixiu 11 100 (đoán tổng = 11)'); return; }
+    if (parts.length < 3) { reply('Cú pháp: !taixiu <tai|xiu|so> <cược>\nVd: !taixiu tai 10k\nVd: !taixiu 11 100 (đoán tổng = 11)'); return; }
     const choiceRaw = normalize(parts[1]);
     const { bet, error } = parseBet(parts, getUser(senderID));
     if (error) { reply(error); return; }
@@ -1242,7 +1255,7 @@ function handleCommand(api, event) {
     if (choiceRaw === 'tai' || choiceRaw === 'xiu') {
       win = (choiceRaw === result);
       payout = win ? bet * 2 : 0;
-      msg = `🎲 TÀI XỈU\nXúc xắc: ${dice.join(' - ')} = ${sum} => ${result.toUpperCase()}${isTriple ? ' (BỘ BAO - tính XỈU)' : ''}\nBan cược: ${choiceRaw.toUpperCase()} ${formatVnd(bet)}\n`;
+      msg = `🎲 TÀI XỈU\nXúc xắc: ${dice.join(' - ')} = ${sum} => ${result.toUpperCase()}${isTriple ? ' (BỘ BAO - tính XỈU)' : ''}\nBạn cược: ${choiceRaw.toUpperCase()} ${formatVnd(bet)}\n`;
     } else if (!isNaN(parseInt(choiceRaw, 10))) {
       const guess = parseInt(choiceRaw, 10);
       if (guess < 3 || guess > 18) { u.balance += bet; reply('Tổng phải từ 3 đến 18. Đã hoàn VNĐ.'); return; }
@@ -1271,17 +1284,17 @@ function handleCommand(api, event) {
     const sendWithImage = (msg) => {
       if (fs.existsSync(BAU_CUA_IMG)) {
         api.sendMessage({ body: msg, attachment: fs.createReadStream(BAU_CUA_IMG) }, threadID, (err) => {
-          if (err) { console.error('❌ Lỗi gửi anh Bau Cua:', err.message || err); reply(msg); }
+          if (err) { console.error('❌ Lỗi gửi ảnh Bầu Cua:', err.message || err); reply(msg); }
         });
       } else {
         reply(msg);
       }
     };
     const cd = checkCooldown(senderID, 3);
-    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa moi chơi được.`); return; }
+    if (cd > 0) { reply(`⏳ Cho ${cd}s nữa mới chơi được.`); return; }
     const parts = text.split(/\s+/);
     if (parts.length < 3) {
-      sendWithImage('🦀 BẦU CUA CÁ TÔM\nCu phap: !baucua <bau|của|tom|ca|ga|nai> <cược>\nVd: !baucua cua 10k\nVd: !baucua tom 200');
+      sendWithImage('🦀 BẦU CUA CÁ TÔM\nCú pháp: !baucua <bau|của|tom|ca|ga|nai> <cược>\nVd: !baucua cua 10k\nVd: !baucua tom 200');
       return;
     }
     const choice = normalize(parts[1]);
@@ -1293,7 +1306,7 @@ function handleCommand(api, event) {
     u.balance -= bet;
 
     const faces = ['bau', 'của', 'tom', 'ca', 'ga', 'nai'];
-    const icons = { bau: '🍐 Bau', của: '🦀 Cua', tom: '🦐 Tom', ca: '🐟 Ca', ga: '🐓 Ga', nai: '🦌 Nai' };
+    const icons = { bau: '🍐 Bầu', của: '🦀 Cua', tom: '🦐 Tôm', ca: '🐟 Cá', ga: '🐓 Gà', nai: '🦌 Nai' };
     const dice = [faces[Math.floor(Math.random() * 6)], faces[Math.floor(Math.random() * 6)], faces[Math.floor(Math.random() * 6)]];
     const count = dice.filter(d => d === choice).length;
     const payout = count === 0 ? 0 : bet * (count + 1); // 1 con nhận 2x, 2 con nhận 3x, 3 con nhận 4x
@@ -1304,7 +1317,7 @@ function handleCommand(api, event) {
     if (count > 0) qmsg2 += addQuestProgress(u, 'win', 1);
     saveData();
 
-    let msg = `🦀 BẦU CUA CÁ TÔM\nXúc xắc: ${dice.map(d => icons[d]).join(' - ')}\nBan cược: ${icons[choice]} ${formatVnd(bet)}\n`;
+    let msg = `🦀 BẦU CUA CÁ TÔM\nXúc xắc: ${dice.map(d => icons[d]).join(' - ')}\nBạn cược: ${icons[choice]} ${formatVnd(bet)}\n`;
     msg += count === 0 ? `😢 Không trúng con nào! Mất ${formatVnd(bet)}\n💰 Số dư: ${formatVnd(u.balance)}`
       : `🎉 Trúng ${count} con! Nhận ${formatVnd(payout)}\n💰 Số dư: ${formatVnd(u.balance)}`;
     sendWithImage(msg);
@@ -1313,7 +1326,7 @@ function handleCommand(api, event) {
 
   // ===== SOI CẦU (chỉ thống kê lịch sử bot, không đủ đoán được kết quả thật) =====
   if (lower === '!soicau' || lower === '!câu' || lower === '!history') {
-    if (!taixiuHistory.length) { reply('Chưa co lịch sử ván Tài Xỉu nao. Cho người chơi vai ván rồi soi nhé!'); return; }
+    if (!taixiuHistory.length) { reply('Chưa có lịch sử ván Tài Xỉu nào. Chờ người chơi vài ván rồi soi nhé!'); return; }
     const last20 = taixiuHistory.slice(-20).reverse();
     const str = last20.map(h => h.result === 'tai' ? 'T' : 'X').join(' ');
     const taiCount = taixiuHistory.filter(h => h.result === 'tai').length;
@@ -1327,10 +1340,10 @@ function handleCommand(api, event) {
     }
     const lastResult = taixiuHistory[taixiuHistory.length - 1].result.toUpperCase();
     reply(`📊 SOI CẦU TÀI XỈU (thống kê ván của bot)\n\n` +
-      `20 ván gần nhất (mới nhất ben trai):\n${str}\n\n` +
-      `Tổng ${taixiuHistory.length} ván:\n• Tai: ${taiCount} (${taiPct}%)\n• Xiu: ${xiuCount} (${100 - taiPct}%)\n` +
+      `20 ván gần nhất (mới nhất bên trái):\n${str}\n\n` +
+      `Tổng ${taixiuHistory.length} ván:\n• Tài: ${taiCount} (${taiPct}%)\n• Xỉu: ${xiuCount} (${100 - taiPct}%)\n` +
       `Cầu hiện tại: ${lastResult} x${streak} liên tiếp\n\n` +
-      `⚠️ Day chỉ la thống kê lịch sử ngẫu nhiên của bot, KHONG dự đoán được kết quả thật o ngoai. Đúng đúng để chơi co bac thật!`);
+      `⚠️ Đây chỉ là thống kê lịch sử ngẫu nhiên của bot, KHÔNG dự đoán được kết quả thật ở ngoài. Đừng dùng để chơi cờ bạc thật!`);
     return;
   }
 
@@ -1369,8 +1382,8 @@ async function main() {
     clearTimeout(loginTimeout);
     if (err) {
       console.error('❌ Đăng nhập thất bại:', err.message || err);
-      console.error('💡 Mẹo: Cookie hết hạn? Hãy lấy lại APPSTATE moi. Acc bi checkpoint? Hãy đổi acc phu khác.');
-      // Cho 60s moi thoát để giam so lần thứ login liên tục (do bi Facebook quet)
+      console.error('💡 Mẹo: Cookie hết hạn? Hãy lấy lại APPSTATE mới. Acc bi checkpoint? Hãy đổi acc phu khác.');
+      // Cho 60s mới thoát để giảm số lần thứ login liên tục (do bị Facebook quét)
       console.log('⏳ Cho 60s rồi thoát để Botkeep restart lại...');
       setTimeout(() => process.exit(1), 60000);
       return;
@@ -1383,10 +1396,10 @@ async function main() {
       const appState = api.getAppState();
       if (appState && appState.length) {
         fs.writeFileSync(path.join(__dirname, 'appstate.json'), JSON.stringify(appState));
-        console.log('💾 Đã lưu appstate.json (neu Botkeep co persistent volume thi lần sau se dùng lại được)');
+        console.log('💾 Đã lưu appstate.json (nếu Botkeep có persistent volume thì lần sau sẽ dùng lại được)');
       }
     } catch (e) {
-      console.log('⚠️ Không luu được appstate:', e.message);
+      console.log('⚠️ Không lưu được appstate:', e.message);
     }
 
     api.setOptions({ listenEvents: true });
@@ -1408,7 +1421,7 @@ async function main() {
         return;
       }
 
-      // Chào mừng / tam biet khi co người vao / rồi khỏi nhóm
+      // Chào mừng / tạm biệt khi có người vào / rồi khỏi nhóm
       if (event.type === 'event') {
         try {
           if (event.logMessageType === 'log:subscribe') {
@@ -1439,7 +1452,7 @@ async function main() {
         }
       } catch (e) {}
 
-      // Xu ly lệnh bắt đầu bang ! HOAC trả lời quiz đang cho
+      // Xu ly lệnh bắt đầu bang ! HOAC trả lời quiz đang chờ
       const isCommand = event.body.trim().startsWith('!');
       const hasQuiz = activeQuiz[event.threadID] && Date.now() < activeQuiz[event.threadID].expiresAt;
       const hasTrieuphu = activeTrieuphu[event.senderID];
