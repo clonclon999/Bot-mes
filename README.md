@@ -238,3 +238,7 @@ Các lệnh `!kick`, `!setbd`, `!ban`, `!mute`, `!warn`, `!give`, `!reset`, `!ad
 - GIF xóc mới hiển thị ba quân riêng biệt quay/lật, thay vì rung cả bàn.
 - Ảnh kết quả dùng trực tiếp hình linh vật Bầu/Cua/Tôm/Cá/Gà/Nai, bố cục một quân lớn và hai quân bên phải giống mẫu Discord.
 - Các tin chính gồm hướng dẫn/trạng thái, mở phiên và kết quả Bầu Cua đều đính kèm ảnh bàn tĩnh; xác nhận từng cược và lỗi nhỏ chỉ dùng chữ để tránh spam ảnh.
+
+### Đếm ngược Bầu Cua trước khi xóc
+
+Khi vòng Bầu Cua khóa cược, bot lần lượt gửi `3`, `2`, `1` cách nhau một giây. Tin chứa số trước được thu hồi trước khi số tiếp theo xuất hiện; sau số `1`, tin đếm cũng được thu hồi rồi bot mới gửi GIF ba quân quay/lật. Sau GIF là ảnh kết quả kiểu Discord và thống kê thắng/thua.

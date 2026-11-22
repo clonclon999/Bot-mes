@@ -444,9 +444,46 @@ function openMultiplayerRound(game, api, threadID) {
   return true;
 }
 
+function runRoundCountdown(round, game, threadID) {
+  const steps = ['3️⃣', '2️⃣', '1️⃣'];
+  let index = 0;
+  let previousMessageID = null;
+  const unsendPrevious = done => {
+    if (!previousMessageID || typeof round.api.unsendMessage !== 'function') return done();
+    round.api.unsendMessage(previousMessageID, () => done());
+  };
+  const next = () => {
+    const active = multiplayerRounds[game][threadID];
+    if (!active || active !== round) return;
+    unsendPrevious(() => {
+      previousMessageID = null;
+      if (index >= steps.length) {
+        round.countdownDone = true;
+        settleMultiplayerRound(game, threadID);
+        return;
+      }
+      round.api.sendMessage({ body: `🔒 ĐÃ KHÓA CƯỢC\n\n          ${steps[index]}\n\nChuẩn bị xem kết quả...`, noAck: true }, threadID, (err, info) => {
+        if (err) console.error('❌ Lỗi gửi đếm ngược:', err.message || err);
+        else previousMessageID = info && (info.messageID || info.messageId);
+        index++;
+        round.timer = setTimeout(next, 1000);
+      });
+    });
+  };
+  next();
+}
+
 function settleMultiplayerRound(game, threadID) {
   const round = multiplayerRounds[game][threadID];
   if (!round) return;
+
+  // Đếm 3-2-1 và thu hồi từng số trước khi phát GIF.
+  if (game === 'baucua' && !round.countdownDone && !round.countdownStarted && round.bets.size > 0) {
+    round.countdownStarted = true;
+    clearTimeout(round.timer);
+    runRoundCountdown(round, game, threadID);
+    return;
+  }
 
   // Messenger hỗ trợ GIF: phát hiệu ứng trước, sau đó mới công bố kết quả.
   if (!round.animationPlayed && round.bets.size > 0) {
