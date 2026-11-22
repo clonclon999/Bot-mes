@@ -127,6 +127,13 @@ const cooldowns = {}; // senderID -> timestamp (chong spam)
 const activeLixi = {}; // threadID -> { amount, creatorID, expiresAt }
 const activeQuiz = {}; // threadID -> { question, answer, reward, expiresAt }
 const activeGuess = {}; // senderID -> { number, attempts }
+// Vòng cược nhiều người theo từng nhóm. Mỗi game chỉ có 1 vòng đang mở/thread.
+const multiplayerRounds = {
+  taixiu: {},
+  baucua: {},
+  lotto: {},
+};
+const MULTI_ROUND_MS = 45 * 1000;
 const activeReaction = {}; // threadID -> { state: 'waiting'|'go', goTime, reward }
 const activeTrieuphu = {}; // senderID -> { step, questions, earned }
 
@@ -342,6 +349,149 @@ function parseBet(args, user) {
   return { bet };
 }
 
+function sendRoundMessage(api, threadID, body, withBaucuaImage = false) {
+  const msg = { body, noAck: true };
+  if (withBaucuaImage) {
+    const img = path.join(__dirname, 'baucua.jpg');
+    if (fs.existsSync(img)) msg.attachment = fs.createReadStream(img);
+  }
+  api.sendMessage(msg, threadID, err => err && console.error('❌ Lỗi gửi kết quả vòng:', err.message || err));
+}
+
+function roundLabel(game) {
+  return game === 'taixiu' ? 'TÀI XỈU' : game === 'baucua' ? 'BẦU CUA' : 'LOTTO';
+}
+
+function openMultiplayerRound(game, api, threadID) {
+  if (multiplayerRounds[game][threadID]) return false;
+  const round = { game, api, threadID, bets: new Map(), closesAt: Date.now() + MULTI_ROUND_MS };
+  multiplayerRounds[game][threadID] = round;
+  round.timer = setTimeout(() => settleMultiplayerRound(game, threadID), MULTI_ROUND_MS);
+  const examples = game === 'taixiu'
+    ? '!taixiu tai 10k hoặc !taixiu 11 10k'
+    : game === 'baucua'
+      ? '!baucua cua 10k'
+      : '!lotto 69 10k';
+  sendRoundMessage(api, threadID,
+    `╭── 🎮 ${roundLabel(game)} NHIỀU NGƯỜI ──╮\n` +
+    `│ ⏳ Mở cược trong 45 giây\n│ 📝 ${examples}\n` +
+    `│ 🔄 Mỗi người được đổi cửa trước khi khóa cược\n╰────────────────────╯`);
+  return true;
+}
+
+function settleMultiplayerRound(game, threadID) {
+  const round = multiplayerRounds[game][threadID];
+  if (!round) return;
+  delete multiplayerRounds[game][threadID];
+  clearTimeout(round.timer);
+  if (!round.bets.size) {
+    sendRoundMessage(round.api, threadID, `⏰ Vòng ${roundLabel(game)} đã hủy vì không có ai đặt cược.`);
+    return;
+  }
+
+  let header = '', resultData;
+  if (game === 'taixiu') {
+    const dice = [1, 2, 3].map(() => 1 + Math.floor(Math.random() * 6));
+    const sum = dice.reduce((a, b) => a + b, 0);
+    const result = sum >= 11 && sum <= 17 ? 'tai' : 'xiu';
+    resultData = { dice, sum, result };
+    taixiuHistory.push({ sum, result, dice });
+    if (taixiuHistory.length > 100) taixiuHistory = taixiuHistory.slice(-100);
+    header = `🎲 Xúc xắc: ${dice.join(' - ')} = ${sum} → ${result.toUpperCase()}`;
+  } else if (game === 'baucua') {
+    const faces = ['bau', 'cua', 'tom', 'ca', 'ga', 'nai'];
+    const dice = [1, 2, 3].map(() => faces[Math.floor(Math.random() * faces.length)]);
+    resultData = { dice };
+    const icon = { bau: '🍐 Bầu', cua: '🦀 Cua', tom: '🦐 Tôm', ca: '🐟 Cá', ga: '🐓 Gà', nai: '🦌 Nai' };
+    header = `🎲 Kết quả: ${dice.map(x => icon[x]).join(' - ')}`;
+  } else {
+    const draw = Math.floor(Math.random() * 100);
+    resultData = { draw };
+    header = `🎱 Kết quả Lotto: ${String(draw).padStart(2, '0')}`;
+  }
+
+  let winners = 0, totalBet = 0;
+  const lines = [];
+  for (const [uid, betInfo] of round.bets) {
+    const u = getUser(uid);
+    totalBet += betInfo.amount;
+    let win = false, payout = 0;
+    if (game === 'taixiu') {
+      const numeric = /^\d+$/.test(betInfo.choice);
+      win = numeric ? Number(betInfo.choice) === resultData.sum : betInfo.choice === resultData.result;
+      payout = win ? betInfo.amount * (numeric ? 5 : 2) : 0;
+    } else if (game === 'baucua') {
+      const count = resultData.dice.filter(x => x === betInfo.choice).length;
+      win = count > 0;
+      payout = win ? betInfo.amount * (count + 1) : 0;
+    } else {
+      win = Number(betInfo.choice) === resultData.draw;
+      payout = win ? betInfo.amount * 50 : 0;
+    }
+    if (win) {
+      winners++;
+      u.balance += payout;
+      u.wins++;
+      addExp(u, game === 'lotto' ? 15 : 10);
+      addQuestProgress(u, 'win', 1);
+      lines.push(`🏆 ...${uid.slice(-6)} | ${betInfo.choice} | +${formatVnd(payout)}`);
+    } else {
+      u.losses++;
+      addExp(u, 2);
+      lines.push(`💔 ...${uid.slice(-6)} | ${betInfo.choice} | -${formatVnd(betInfo.amount)}`);
+    }
+    addQuestProgress(u, game, 1);
+  }
+  saveData();
+  sendRoundMessage(round.api, threadID,
+    `╭── 📣 KẾT QUẢ ${roundLabel(game)} ──╮\n${header}\n` +
+    `💰 Tổng cược: ${formatVnd(totalBet)} | 🏆 ${winners}/${round.bets.size} người thắng\n` +
+    `────────────────────\n${lines.join('\n')}\n╰────────────────────╯`,
+    game === 'baucua');
+}
+
+function placeMultiplayerBet(game, api, event, parts, reply) {
+  const threadID = event.threadID;
+  const senderID = String(event.senderID);
+  const round = multiplayerRounds[game][threadID];
+  if (!round) {
+    reply(`Chưa có vòng ${roundLabel(game)}. Gõ !${game} start để mở vòng 45 giây.`);
+    return true;
+  }
+  if (Date.now() >= round.closesAt) { reply('⏳ Vòng đang khóa cược, chờ kết quả nhé!'); return true; }
+  if (parts.length < 3) { reply(`Thiếu lựa chọn hoặc tiền cược. Ví dụ: !${game} ${game === 'lotto' ? '69' : game === 'baucua' ? 'cua' : 'tai'} 10k`); return true; }
+  let choice = normalize(parts[1]);
+  if (game === 'baucua' && choice === 'của') choice = 'cua';
+  const valid = game === 'taixiu'
+    ? (['tai', 'xiu'].includes(choice) || (/^\d+$/.test(choice) && Number(choice) >= 3 && Number(choice) <= 18))
+    : game === 'baucua'
+      ? ['bau', 'cua', 'tom', 'ca', 'ga', 'nai'].includes(choice)
+      : /^\d{1,2}$/.test(choice) && Number(choice) <= 99;
+  if (!valid) { reply('❌ Lựa chọn không hợp lệ. Hãy xem lại cú pháp trong !help.'); return true; }
+  if (game === 'lotto') choice = String(Number(choice)).padStart(2, '0');
+
+  const u = getUser(senderID);
+  const old = round.bets.get(senderID);
+  if (old) u.balance += old.amount; // đổi cửa: hoàn cược cũ trước
+  const amount = parseAmountInput(parts[2], u.balance);
+  if (!amount || amount <= 0 || amount > 10000000) {
+    if (old) u.balance -= old.amount;
+    reply('❌ Tiền cược phải từ 1 đến 10.000.000 VNĐ. Hỗ trợ 10k, 1tr, all, half.');
+    return true;
+  }
+  if (amount > u.balance) {
+    if (old) u.balance -= old.amount;
+    reply(`❌ Không đủ tiền! Số dư: ${formatVnd(u.balance)}`);
+    return true;
+  }
+  u.balance -= amount;
+  round.bets.set(senderID, { choice, amount });
+  saveData();
+  const left = Math.max(1, Math.ceil((round.closesAt - Date.now()) / 1000));
+  reply(`✅ Đã ${old ? 'đổi' : 'đặt'} cược: ${choice.toUpperCase()} — ${formatVnd(amount)}\n⏳ Còn ${left} giây | 👥 ${round.bets.size} người đã cược`);
+  return true;
+}
+
 function handleCommand(api, event) {
   const text = (event.body || '').trim();
   const lower = text.toLowerCase();
@@ -370,6 +520,28 @@ function handleCommand(api, event) {
     return; // đang bi mute thi im lang
   }
 
+  // ===== PHÒNG CƯỢC NHIỀU NGƯỜI (45 GIÂY) =====
+  for (const game of ['taixiu', 'baucua', 'lotto']) {
+    if (lower === `!${game} start`) {
+      if (!openMultiplayerRound(game, api, threadID)) {
+        const r = multiplayerRounds[game][threadID];
+        const left = Math.max(1, Math.ceil((r.closesAt - Date.now()) / 1000));
+        reply(`⚠️ Đã có vòng ${roundLabel(game)} đang mở. Còn ${left} giây, ${r.bets.size} người đã cược.`);
+      }
+      return;
+    }
+    if (lower === `!${game}`) {
+      const r = multiplayerRounds[game][threadID];
+      if (!r) reply(`🎮 Gõ !${game} start để mở vòng cược chung 45 giây.`);
+      else reply(`⏳ Vòng ${roundLabel(game)} còn ${Math.max(1, Math.ceil((r.closesAt - Date.now()) / 1000))} giây — ${r.bets.size} người đã cược.`);
+      return;
+    }
+    if (lower.startsWith(`!${game} `)) {
+      placeMultiplayerBet(game, api, event, text.split(/\s+/), reply);
+      return;
+    }
+  }
+
   if (lower === '!help' || lower === '!menu' || lower === 'menu') {
     reply('🤖 DANH SACH LENH:\n\n' +
       '• !hi - Chào hỏi\n• !ping - Kiểm tra bot\n• !time / !giờ - Xem giờ\n' +
@@ -379,10 +551,10 @@ function handleCommand(api, event) {
       '• !fish - Đi câu cá\n• !farm - Trồng cây thứ hoach\n' +
       '• !bank <số tiền> @tên - Chuyển tiền cho người khác\n' +
       '  Vd: !bank 50k @TenBan\n' +
-      '• !taixiu <tai|xiu|so> <cược> - Vd: !taixiu tai 10k\n' +
-      '• !baucua <bau|của|tom|ca|ga|nai> <cược> - Vd: !baucua cua 10k\n' +
+      '• !taixiu start - Mở vòng chung 45s; cược: !taixiu tai 10k\n' +
+      '• !baucua start - Mở vòng chung 45s; cược: !baucua cua 10k\n' +
       '• !slot <cược> - Quay xeng, Vd: !slot 10k\n' +
-      '• !lotto <so 00-99> <cược> - Xổ số, Vd: !lotto 69 10k\n' +
+      '• !lotto start - Mở vòng chung 45s; cược: !lotto 69 10k\n' +
       '• !lixi <tiền> - Thả lì xì, người khác gõ !nhận để nhận\n' +
       '• !quiz - Do vui có thưởng (trả lời đúng đầu tiên)\n' +
       '• !soicau - Xem lịch sử Tai/Xiu\n• !top - Đại gia nhất nhóm\n' +

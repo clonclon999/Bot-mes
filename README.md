@@ -190,3 +190,13 @@ Loại bỏ reconnect sai sau 45 giây không có tin nhắn; dùng MQTT keepali
 - Các lệnh cược/chuyển/lì xì/admin give hỗ trợ `10k`, `1,5tr`, `1m`, `1ty`, `all/max/tất tay`, `half/nửa`, ngoài số thường và số có dấu chấm.
 - Ví dụ: `!taixiu tai 10k`, `!slot 50k`, `!bank 1tr @tên`.
 - Các bảng ví, daily, work và level dùng khung chữ/emoji; level có thanh tiến trình. Messenger không hỗ trợ Discord Embed/Button nên giao diện được tối ưu bằng Unicode.
+
+## Phòng cược nhiều người (Messenger)
+
+Ba game cược chung theo nhóm, mở vòng bằng lệnh riêng và khóa cược sau 45 giây:
+
+- `!taixiu start` → mọi người cược `!taixiu tai 10k`, `!taixiu xiu 20k` hoặc `!taixiu 11 5k`.
+- `!baucua start` → mọi người cược `!baucua cua 10k`, `!baucua tom 20k`...
+- `!lotto start` → mọi người cược `!lotto 69 10k`.
+
+Mỗi người có một vé cược mỗi vòng và có thể đổi cửa/tiền trước khi hết giờ; cược cũ được hoàn rồi thay bằng cược mới. Hết 45 giây bot dùng một kết quả chung, công bố danh sách thắng/thua và cập nhật tiền/EXP/nhiệm vụ cho tất cả. Quiz, phản xạ và lì xì vốn đã là game tranh nhanh nhiều người. Câu cá, farm, slot, đoán số và triệu phú giữ dạng cá nhân vì bản chất game là tiến trình riêng.
