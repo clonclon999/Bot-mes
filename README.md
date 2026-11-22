@@ -228,3 +228,7 @@ Sau GIF quay/xóc, bot tự dựng một ảnh PNG riêng cho kết quả thật
 ### Tự dọn tin nhắn phiên sau 5 phút
 
 Các tin do bot gửi cho vòng cược nhiều người (mở phiên, GIF quay/xóc và ảnh tổng kết) được lên lịch thu hồi sau 5 phút bằng `unsendMessage`. Bot chỉ thu hồi được tin của chính tài khoản bot; không thể xóa tin đặt cược do thành viên gửi. Nếu Messenger từ chối thu hồi hoặc bot khởi động lại trước thời hạn, tin có thể vẫn còn.
+
+### Tương thích tag người dùng của Orion FCA
+
+Các lệnh `!kick`, `!setbd`, `!ban`, `!mute`, `!warn`, `!give`, `!reset`, `!addadmin`, `!deladmin` và `!bank` nhận được cả hai kiểu dữ liệu mention (array và object). Thứ tự tham số `removeUserFromGroup(userID, threadID)` cũng đã được sửa đúng.

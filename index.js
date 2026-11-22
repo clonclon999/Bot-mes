@@ -729,9 +729,13 @@ function handleCommand(api, event) {
     // Lay người nhận: uu tiền mention, sau do đến ID so trong tin nhắn
     let recipientID = null;
     let recipientName = '';
-    if (event.mentions && event.mentions.length > 0) {
-      recipientID = String(event.mentions[0].id);
-      recipientName = event.mentions[0].name || '';
+    if (event.mentions && Array.isArray(event.mentions) && event.mentions.length > 0) {
+      recipientID = String(event.mentions[0].id || event.mentions[0].userID);
+      recipientName = event.mentions[0].name || event.mentions[0].tag || '';
+    } else if (event.mentions && typeof event.mentions === 'object' && Object.keys(event.mentions).length > 0) {
+      const [mentionID, mentionValue] = Object.entries(event.mentions)[0];
+      recipientID = String((mentionValue && typeof mentionValue === 'object' && (mentionValue.id || mentionValue.userID)) || mentionID);
+      recipientName = String(mentionValue && typeof mentionValue === 'object' ? (mentionValue.name || mentionValue.tag || '') : (mentionValue || '')).replace(/^@/, '');
     } else {
       for (const p of parts) {
         if (/^\d{10,}$/.test(p)) { recipientID = p; break; }
@@ -964,15 +968,36 @@ function handleCommand(api, event) {
   }
 
   // ===== ADMIN =====
+  // FCA có thể trả mentions dạng mảng [{id, name}] hoặc object {userID: '@Tên'}.
+  const getFirstMention = () => {
+    const mentions = event.mentions;
+    if (!mentions) return null;
+    if (Array.isArray(mentions) && mentions.length > 0) {
+      const m = mentions[0] || {};
+      return { id: String(m.id || m.userID || ''), name: String(m.name || m.tag || '').replace(/^@/, '') };
+    }
+    if (typeof mentions === 'object') {
+      const entries = Object.entries(mentions);
+      if (entries.length > 0) {
+        const [key, value] = entries[0];
+        if (value && typeof value === 'object') {
+          return { id: String(value.id || value.userID || key), name: String(value.name || value.tag || '').replace(/^@/, '') };
+        }
+        return { id: String(key), name: String(value || '').replace(/^@/, '') };
+      }
+    }
+    return null;
+  };
   const getMentionID = () => {
-    if (event.mentions && event.mentions.length > 0) return String(event.mentions[0].id);
+    const mention = getFirstMention();
+    if (mention && mention.id) return mention.id;
     const parts = text.split(/\s+/);
     for (const part of parts) if (/^\d{10,}$/.test(part)) return part;
     return null;
   };
   const getMentionName = () => {
-    if (event.mentions && event.mentions.length > 0) return event.mentions[0].name || '';
-    return '';
+    const mention = getFirstMention();
+    return mention ? mention.name : '';
   };
 
   if (lower === '!adminhelp') {
@@ -1023,7 +1048,7 @@ function handleCommand(api, event) {
     getUser(target).banned = true;
     saveData();
     if (api.removeUserFromGroup) {
-      api.removeUserFromGroup(threadID, target, (err) => {
+      api.removeUserFromGroup(target, threadID, (err) => {
         if (err) reply(`Đã cấm khỏi bot: ${getMentionName() || target} (không kick được khỏi nhóm thật: ${err.message || err})`);
         else reply(`👢 Đã kick ${getMentionName() || target} khỏi nhóm!`);
       });
@@ -1035,7 +1060,7 @@ function handleCommand(api, event) {
   if (lower.startsWith('!setbd')) {
     if (!isSenderAdmin) { reply('Chỉ admin bot mới được đặt biệt danh.'); return; }
     const target = getMentionID();
-    if (!target || !event.mentions || event.mentions.length === 0) {
+    if (!target || !getFirstMention()) {
       reply('Cú pháp: !setbd @tên <biệt danh mới>\nXóa biệt danh: !setbd @tên clear');
       return;
     }
