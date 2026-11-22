@@ -49,6 +49,7 @@ require('dotenv').config(); // Botkeep ghi biến môi trường vao file .env, 
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
+const sharp = require('sharp');
 
 // ===== HEALTH CHECK (để Botkeep biet bot con song) =====
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
@@ -362,6 +363,37 @@ function roundLabel(game) {
   return game === 'taixiu' ? 'TÀI XỈU' : game === 'baucua' ? 'BẦU CUA' : 'LOTTO';
 }
 
+function escapeSvg(value) {
+  return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+}
+
+async function createRoundResultCard(game, resultData, totalBet, winners, totalPlayers, entries) {
+  const id = `${game}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const out = path.join(__dirname, 'tmp', `${id}.png`);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const labels = { bau: 'BẦU', cua: 'CUA', tom: 'TÔM', ca: 'CÁ', ga: 'GÀ', nai: 'NAI' };
+  const colors = { bau: '#78c850', cua: '#ff7043', tom: '#ff5252', ca: '#42a5f5', ga: '#ffca28', nai: '#ab8262' };
+  let resultBoxes = '';
+  if (game === 'baucua') {
+    resultBoxes = resultData.dice.map((face, i) => {
+      const x = 75 + i * 270;
+      return `<g><rect x="${x}" y="200" width="230" height="190" rx="28" fill="${colors[face]}" stroke="#ffd968" stroke-width="7"/><circle cx="${x + 115}" cy="270" r="46" fill="#fff" opacity=".94"/><text x="${x + 115}" y="286" class="face" text-anchor="middle">${escapeSvg(labels[face])}</text><text x="${x + 115}" y="360" class="box" text-anchor="middle">XÚC XẮC ${escapeSvg(labels[face])}</text></g>`;
+    }).join('');
+  } else if (game === 'taixiu') {
+    resultBoxes = resultData.dice.map((n, i) => `<g><rect x="${105 + i * 245}" y="210" width="180" height="170" rx="28" fill="#fff8e7" stroke="#ffd968" stroke-width="7"/><text x="${195 + i * 245}" y="320" class="die" text-anchor="middle">${n}</text></g>`).join('');
+  } else {
+    resultBoxes = `<circle cx="450" cy="295" r="112" fill="#fff" stroke="#ffd968" stroke-width="10"/><text x="450" y="330" class="lotto" text-anchor="middle">${String(resultData.draw).padStart(2, '0')}</text>`;
+  }
+  const resultTitle = game === 'baucua' ? resultData.dice.map(x => labels[x]).join(' • ') : game === 'taixiu' ? `${resultData.dice.join(' + ')} = ${resultData.sum} • ${resultData.result.toUpperCase()}` : `SỐ MAY MẮN ${String(resultData.draw).padStart(2, '0')}`;
+  const maxRows = 8;
+  const rows = entries.slice(0, maxRows).map((e, i) => `<g><rect x="55" y="${585 + i * 55}" width="790" height="43" rx="12" fill="${e.win ? '#173f35' : '#40252d'}"/><text x="78" y="${615 + i * 55}" class="row">${e.win ? 'THẮNG' : 'THUA'}  •  ...${escapeSvg(e.uid.slice(-6))}  •  ${escapeSvg(e.choice.toUpperCase())}  •  ${e.win ? '+' : '-'}${escapeSvg(formatVnd(e.win ? e.payout : e.amount))}</text></g>`).join('');
+  const extra = entries.length > maxRows ? `<text x="450" y="${610 + maxRows * 55}" class="small" text-anchor="middle">...và ${entries.length - maxRows} người chơi khác</text>` : '';
+  const height = 670 + Math.min(entries.length, maxRows) * 55;
+  const svg = `<svg width="900" height="${height}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#25132f"/><stop offset="1" stop-color="#101b2d"/></linearGradient></defs><style>.title{font:700 44px sans-serif;fill:#fff}.sub{font:700 27px sans-serif;fill:#ffe17b}.face{font:800 25px sans-serif;fill:#32151a}.box{font:800 21px sans-serif;fill:#fff}.die{font:800 82px sans-serif;fill:#b71c35}.lotto{font:800 92px sans-serif;fill:#d51f3d}.stat{font:700 24px sans-serif;fill:#fff}.row{font:700 20px sans-serif;fill:#fff}.small{font:20px sans-serif;fill:#cdd7e8}</style><rect width="900" height="${height}" rx="34" fill="url(#bg)"/><rect x="18" y="18" width="864" height="${height - 36}" rx="28" fill="none" stroke="#e5ad32" stroke-width="5"/><text x="450" y="82" class="title" text-anchor="middle">KẾT QUẢ PHIÊN ${escapeSvg(roundLabel(game))}</text><text x="450" y="132" class="sub" text-anchor="middle">#${escapeSvg(id.toUpperCase())}</text><text x="450" y="178" class="sub" text-anchor="middle">${escapeSvg(resultTitle)}</text>${resultBoxes}<rect x="55" y="430" width="790" height="115" rx="22" fill="#ffffff" opacity=".09"/><text x="80" y="474" class="stat">NGƯỜI CHƠI: ${totalPlayers}     •     NGƯỜI THẮNG: ${winners}</text><text x="80" y="520" class="stat">TỔNG TIỀN CƯỢC: ${escapeSvg(formatVnd(totalBet))}</text><text x="55" y="570" class="sub">DANH SÁCH KẾT QUẢ</text>${rows}${extra}</svg>`;
+  await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(out);
+  return out;
+}
+
 function openMultiplayerRound(game, api, threadID) {
   if (multiplayerRounds[game][threadID]) return false;
   const round = { game, api, threadID, bets: new Map(), closesAt: Date.now() + MULTI_ROUND_MS };
@@ -404,7 +436,7 @@ function settleMultiplayerRound(game, threadID) {
   delete multiplayerRounds[game][threadID];
   clearTimeout(round.timer);
   if (!round.bets.size) {
-    sendRoundMessage(round.api, threadID, `⏰ Vòng ${roundLabel(game)} đã hủy vì không có ai đặt cược.`);
+    // Không có người cược: hủy im lặng để tránh spam nhóm.
     return;
   }
 
@@ -431,6 +463,7 @@ function settleMultiplayerRound(game, threadID) {
 
   let winners = 0, totalBet = 0;
   const lines = [];
+  const resultEntries = [];
   for (const [uid, betInfo] of round.bets) {
     const u = getUser(uid);
     totalBet += betInfo.amount;
@@ -459,14 +492,25 @@ function settleMultiplayerRound(game, threadID) {
       addExp(u, 2);
       lines.push(`💔 ...${uid.slice(-6)} | ${betInfo.choice} | -${formatVnd(betInfo.amount)}`);
     }
+    resultEntries.push({ uid, choice: betInfo.choice, amount: betInfo.amount, payout, win });
     addQuestProgress(u, game, 1);
   }
   saveData();
-  sendRoundMessage(round.api, threadID,
+  const resultBody =
     `╭── 📣 KẾT QUẢ ${roundLabel(game)} ──╮\n${header}\n` +
     `💰 Tổng cược: ${formatVnd(totalBet)} | 🏆 ${winners}/${round.bets.size} người thắng\n` +
-    `────────────────────\n${lines.join('\n')}\n╰────────────────────╯`,
-    game === 'baucua');
+    `────────────────────\n${lines.join('\n')}\n╰────────────────────╯`;
+  createRoundResultCard(game, resultData, totalBet, winners, round.bets.size, resultEntries)
+    .then(card => {
+      round.api.sendMessage({ body: resultBody, attachment: fs.createReadStream(card), noAck: true }, threadID, err => {
+        if (err) console.error('❌ Lỗi gửi ảnh tổng kết:', err.message || err);
+        fs.unlink(card, () => {});
+      });
+    })
+    .catch(err => {
+      console.error('❌ Lỗi tạo ảnh tổng kết:', err.message || err);
+      sendRoundMessage(round.api, threadID, resultBody, game === 'baucua');
+    });
 }
 
 function placeMultiplayerBet(game, api, event, parts, reply) {

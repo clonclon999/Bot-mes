@@ -220,3 +220,7 @@ GIF chỉ gửi một lần ở thời điểm công bố/quay để tránh spam
 - `!setbd @tên clear` — xóa biệt danh hiện tại.
 
 Tài khoản Facebook chạy bot phải có quyền đổi biệt danh trong cuộc trò chuyện. Bot giới hạn biệt danh ở 80 ký tự và chỉ admin bot được dùng lệnh này.
+
+### Ảnh tổng kết phiên kiểu Discord, tối ưu cho Messenger
+
+Sau GIF quay/xóc, bot tự dựng một ảnh PNG riêng cho kết quả thật của phiên, gồm: mã phiên, ba kết quả, tổng người chơi, số người thắng, tổng cược và tối đa 8 dòng thắng/thua. Messenger không có Embed như Discord nên ảnh và phần chữ được gửi chung trong một tin nhắn. Phiên 0 người cược được hủy im lặng để không spam nhóm.
