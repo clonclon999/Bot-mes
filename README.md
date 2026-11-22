@@ -224,3 +224,7 @@ Tài khoản Facebook chạy bot phải có quyền đổi biệt danh trong cu�
 ### Ảnh tổng kết phiên kiểu Discord, tối ưu cho Messenger
 
 Sau GIF quay/xóc, bot tự dựng một ảnh PNG riêng cho kết quả thật của phiên, gồm: mã phiên, ba kết quả, tổng người chơi, số người thắng, tổng cược và tối đa 8 dòng thắng/thua. Messenger không có Embed như Discord nên ảnh và phần chữ được gửi chung trong một tin nhắn. Phiên 0 người cược được hủy im lặng để không spam nhóm.
+
+### Tự dọn tin nhắn phiên sau 5 phút
+
+Các tin do bot gửi cho vòng cược nhiều người (mở phiên, GIF quay/xóc và ảnh tổng kết) được lên lịch thu hồi sau 5 phút bằng `unsendMessage`. Bot chỉ thu hồi được tin của chính tài khoản bot; không thể xóa tin đặt cược do thành viên gửi. Nếu Messenger từ chối thu hồi hoặc bot khởi động lại trước thời hạn, tin có thể vẫn còn.

@@ -350,13 +350,30 @@ function parseBet(args, user) {
   return { bet };
 }
 
+const ROUND_MESSAGE_TTL_MS = 5 * 60 * 1000;
+
+function scheduleBotMessageCleanup(api, messageInfo) {
+  const messageID = messageInfo && (messageInfo.messageID || messageInfo.messageId);
+  if (!messageID || typeof api.unsendMessage !== 'function') return;
+  const timer = setTimeout(() => {
+    api.unsendMessage(messageID, err => {
+      if (err) console.error('⚠️ Không thể thu hồi tin cũ:', err.message || err);
+    });
+  }, ROUND_MESSAGE_TTL_MS);
+  // Timer dọn tin không được giữ tiến trình Node sống khi bot đang thoát.
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
 function sendRoundMessage(api, threadID, body, withBầucuaImage = false) {
   const msg = { body, noAck: true };
   if (withBầucuaImage) {
     const img = path.join(__dirname, 'baucua.jpg');
     if (fs.existsSync(img)) msg.attachment = fs.createReadStream(img);
   }
-  api.sendMessage(msg, threadID, err => err && console.error('❌ Lỗi gửi kết quả vòng:', err.message || err));
+  api.sendMessage(msg, threadID, (err, info) => {
+    if (err) console.error('❌ Lỗi gửi kết quả vòng:', err.message || err);
+    else scheduleBotMessageCleanup(api, info);
+  });
 }
 
 function roundLabel(game) {
@@ -428,7 +445,10 @@ function settleMultiplayerRound(game, threadID) {
     const gif = file && path.join(__dirname, file);
     const loading = { body: `${title || '🎮 ĐANG QUAY...'} Kết quả sắp có!`, noAck: true };
     if (gif && fs.existsSync(gif)) loading.attachment = fs.createReadStream(gif);
-    round.api.sendMessage(loading, threadID, err => err && console.error('❌ Lỗi gửi GIF trò chơi:', err.message || err));
+    round.api.sendMessage(loading, threadID, (err, info) => {
+      if (err) console.error('❌ Lỗi gửi GIF trò chơi:', err.message || err);
+      else scheduleBotMessageCleanup(round.api, info);
+    });
     round.timer = setTimeout(() => settleMultiplayerRound(game, threadID), 2600);
     return;
   }
@@ -502,8 +522,9 @@ function settleMultiplayerRound(game, threadID) {
     `────────────────────\n${lines.join('\n')}\n╰────────────────────╯`;
   createRoundResultCard(game, resultData, totalBet, winners, round.bets.size, resultEntries)
     .then(card => {
-      round.api.sendMessage({ body: resultBody, attachment: fs.createReadStream(card), noAck: true }, threadID, err => {
+      round.api.sendMessage({ body: resultBody, attachment: fs.createReadStream(card), noAck: true }, threadID, (err, info) => {
         if (err) console.error('❌ Lỗi gửi ảnh tổng kết:', err.message || err);
+        else scheduleBotMessageCleanup(round.api, info);
         fs.unlink(card, () => {});
       });
     })
