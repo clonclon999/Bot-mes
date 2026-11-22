@@ -213,3 +213,10 @@ Khi vòng Bầu Cua 45 giây khóa cược, bot gửi `baucua_roll.gif` (hiệu 
 - `slot_spin.gif`: ba ô quay trước kết quả Slot cá nhân.
 
 GIF chỉ gửi một lần ở thời điểm công bố/quay để tránh spam nhóm và giảm nguy cơ Facebook giới hạn tài khoản. Các game không cần hình vẫn dùng khung Unicode nhẹ.
+
+### Đặt biệt danh thành viên (admin bot)
+
+- `!setbd @tên <biệt danh mới>` — đổi biệt danh của thành viên trong nhóm Messenger.
+- `!setbd @tên clear` — xóa biệt danh hiện tại.
+
+Tài khoản Facebook chạy bot phải có quyền đổi biệt danh trong cuộc trò chuyện. Bot giới hạn biệt danh ở 80 ký tự và chỉ admin bot được dùng lệnh này.

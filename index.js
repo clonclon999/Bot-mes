@@ -914,8 +914,9 @@ function handleCommand(api, event) {
     if (!isSenderAdmin) { reply('Chỉ admin mới xem được lệnh nay.'); return; }
     reply('🛡️ LENH ADMIN:\n\n' +
       '• !addadmin @tên - Thêm admin\n• !deladmin @tên - Xóa admin\n• !admins - Danh sach admin\n' +
-      '• !kick @tên - Kick khỏi nhóm (neu bot la admin nhóm)\n' +
-      '• !bạn @tên / !unban @tên - Cấm bot / Go cấm\n' +
+      '• !kick @tên - Kick khỏi nhóm (nếu bot là admin nhóm)\n' +
+      '• !setbd @tên <biệt danh> - Đặt biệt danh\n• !setbd @tên clear - Xóa biệt danh\n' +
+      '• !ban @tên / !unban @tên - Cấm bot / Gỡ cấm\n' +
       '• !mute @tên <phút> / !unmute @tên - Tắt tiếng tam thôi\n' +
       '• !warn @tên - Cảnh cáo (3 lần = mute 10 phút)\n' +
       '• !give @tên <tiền> - Tặng tiền\n• !reset @tên - Reset tiền về 100.000\n' +
@@ -953,7 +954,7 @@ function handleCommand(api, event) {
     const target = getMentionID();
     if (!target) { reply('Cú pháp: !kick @tên'); return; }
     if (String(target) === String(senderID)) { reply('Không thể tự kick chính mình!'); return; }
-    // Thu kick thật khỏi nhóm neu API ho tro, dong thôi bạn khỏi bot
+    // Thử kick thật khỏi nhóm nếu API hỗ trợ, đồng thời cấm khỏi bot.
     getUser(target).banned = true;
     saveData();
     if (api.removeUserFromGroup) {
@@ -966,7 +967,43 @@ function handleCommand(api, event) {
     }
     return;
   }
-  if (lower.startsWith('!bạn')) {
+  if (lower.startsWith('!setbd')) {
+    if (!isSenderAdmin) { reply('Chỉ admin bot mới được đặt biệt danh.'); return; }
+    const target = getMentionID();
+    if (!target || !event.mentions || event.mentions.length === 0) {
+      reply('Cú pháp: !setbd @tên <biệt danh mới>\nXóa biệt danh: !setbd @tên clear');
+      return;
+    }
+    const mentionName = getMentionName();
+    let nickname = text.slice('!setbd'.length).trim();
+    // Xóa phần @tên khỏi câu lệnh, giữ nguyên dấu và khoảng trắng của biệt danh.
+    if (mentionName) {
+      const atName = '@' + mentionName;
+      nickname = nickname.replace(atName, '').trim();
+      if (nickname === text.slice('!setbd'.length).trim()) nickname = nickname.replace(mentionName, '').trim();
+    }
+    if (!nickname) {
+      reply('Bạn chưa nhập biệt danh.\nVí dụ: !setbd @Nguyễn Mèo lười');
+      return;
+    }
+    const clear = ['clear', 'xoa', 'xóa', 'none', 'reset'].includes(normalize(nickname));
+    const newNickname = clear ? '' : nickname.slice(0, 80);
+    if (typeof api.changeNickname !== 'function') {
+      reply('Phiên bản API hiện tại không hỗ trợ đổi biệt danh.');
+      return;
+    }
+    api.changeNickname(newNickname, threadID, target, err => {
+      if (err) {
+        reply(`❌ Không đổi được biệt danh. Hãy kiểm tra quyền của tài khoản bot.\nLỗi: ${err.message || err}`);
+      } else if (clear) {
+        reply(`✅ Đã xóa biệt danh của ${mentionName || ('...' + String(target).slice(-6))}.`);
+      } else {
+        reply(`✅ Đã đặt biệt danh của ${mentionName || ('...' + String(target).slice(-6))} thành “${newNickname}”.`);
+      }
+    });
+    return;
+  }
+  if (lower.startsWith('!ban') || lower.startsWith('!bạn')) {
     if (!isSenderAdmin) { reply('Chỉ admin mới bạn được.'); return; }
     const target = getMentionID();
     if (!target) { reply('Cú pháp: !bạn @tên'); return; }
