@@ -392,21 +392,36 @@ async function createRoundResultCard(game, resultData, totalBet, winners, totalP
   const colors = { bau: '#78c850', cua: '#ff7043', tom: '#ff5252', ca: '#42a5f5', ga: '#ffca28', nai: '#ab8262' };
   let resultBoxes = '';
   if (game === 'baucua') {
-    resultBoxes = resultData.dice.map((face, i) => {
-      const x = 75 + i * 270;
-      return `<g><rect x="${x}" y="200" width="230" height="190" rx="28" fill="${colors[face]}" stroke="#ffd968" stroke-width="7"/><circle cx="${x + 115}" cy="270" r="46" fill="#fff" opacity=".94"/><text x="${x + 115}" y="286" class="face" text-anchor="middle">${escapeSvg(labels[face])}</text><text x="${x + 115}" y="360" class="box" text-anchor="middle">XÚC XẮC ${escapeSvg(labels[face])}</text></g>`;
-    }).join('');
+    const tileUri = face => {
+      const file = path.join(__dirname, `baucua_${face}.jpg`);
+      return `data:image/jpeg;base64,${fs.readFileSync(file).toString('base64')}`;
+    };
+    const [a, b, c] = resultData.dice;
+    resultBoxes = `<g>
+      <rect x="45" y="195" width="500" height="370" rx="30" fill="#980f14" stroke="#ffd968" stroke-width="7"/>
+      <image href="${tileUri(a)}" x="60" y="210" width="470" height="300" preserveAspectRatio="xMidYMid slice"/>
+      <text x="295" y="548" class="box" text-anchor="middle">XÚC XẮC ${escapeSvg(labels[a])}</text>
+      <rect x="570" y="195" width="285" height="175" rx="24" fill="#980f14" stroke="#ffd968" stroke-width="7"/>
+      <image href="${tileUri(b)}" x="582" y="207" width="261" height="116" preserveAspectRatio="xMidYMid slice"/>
+      <text x="712" y="354" class="box" text-anchor="middle">XÚC XẮC ${escapeSvg(labels[b])}</text>
+      <rect x="570" y="390" width="285" height="175" rx="24" fill="#980f14" stroke="#ffd968" stroke-width="7"/>
+      <image href="${tileUri(c)}" x="582" y="402" width="261" height="116" preserveAspectRatio="xMidYMid slice"/>
+      <text x="712" y="549" class="box" text-anchor="middle">XÚC XẮC ${escapeSvg(labels[c])}</text>
+    </g>`;
   } else if (game === 'taixiu') {
     resultBoxes = resultData.dice.map((n, i) => `<g><rect x="${105 + i * 245}" y="210" width="180" height="170" rx="28" fill="#fff8e7" stroke="#ffd968" stroke-width="7"/><text x="${195 + i * 245}" y="320" class="die" text-anchor="middle">${n}</text></g>`).join('');
   } else {
     resultBoxes = `<circle cx="450" cy="295" r="112" fill="#fff" stroke="#ffd968" stroke-width="10"/><text x="450" y="330" class="lotto" text-anchor="middle">${String(resultData.draw).padStart(2, '0')}</text>`;
   }
   const resultTitle = game === 'baucua' ? resultData.dice.map(x => labels[x]).join(' • ') : game === 'taixiu' ? `${resultData.dice.join(' + ')} = ${resultData.sum} • ${resultData.result.toUpperCase()}` : `SỐ MAY MẮN ${String(resultData.draw).padStart(2, '0')}`;
+  const statsY = game === 'baucua' ? 600 : 430;
+  const listTitleY = statsY + 140;
+  const rowsY = listTitleY + 25;
   const maxRows = 8;
-  const rows = entries.slice(0, maxRows).map((e, i) => `<g><rect x="55" y="${585 + i * 55}" width="790" height="43" rx="12" fill="${e.win ? '#173f35' : '#40252d'}"/><text x="78" y="${615 + i * 55}" class="row">${e.win ? 'THẮNG' : 'THUA'}  •  ...${escapeSvg(e.uid.slice(-6))}  •  ${escapeSvg(e.choice.toUpperCase())}  •  ${e.win ? '+' : '-'}${escapeSvg(formatVnd(e.win ? e.payout : e.amount))}</text></g>`).join('');
-  const extra = entries.length > maxRows ? `<text x="450" y="${610 + maxRows * 55}" class="small" text-anchor="middle">...và ${entries.length - maxRows} người chơi khác</text>` : '';
-  const height = 670 + Math.min(entries.length, maxRows) * 55;
-  const svg = `<svg width="900" height="${height}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#25132f"/><stop offset="1" stop-color="#101b2d"/></linearGradient></defs><style>.title{font:700 44px sans-serif;fill:#fff}.sub{font:700 27px sans-serif;fill:#ffe17b}.face{font:800 25px sans-serif;fill:#32151a}.box{font:800 21px sans-serif;fill:#fff}.die{font:800 82px sans-serif;fill:#b71c35}.lotto{font:800 92px sans-serif;fill:#d51f3d}.stat{font:700 24px sans-serif;fill:#fff}.row{font:700 20px sans-serif;fill:#fff}.small{font:20px sans-serif;fill:#cdd7e8}</style><rect width="900" height="${height}" rx="34" fill="url(#bg)"/><rect x="18" y="18" width="864" height="${height - 36}" rx="28" fill="none" stroke="#e5ad32" stroke-width="5"/><text x="450" y="82" class="title" text-anchor="middle">KẾT QUẢ PHIÊN ${escapeSvg(roundLabel(game))}</text><text x="450" y="132" class="sub" text-anchor="middle">#${escapeSvg(id.toUpperCase())}</text><text x="450" y="178" class="sub" text-anchor="middle">${escapeSvg(resultTitle)}</text>${resultBoxes}<rect x="55" y="430" width="790" height="115" rx="22" fill="#ffffff" opacity=".09"/><text x="80" y="474" class="stat">NGƯỜI CHƠI: ${totalPlayers}     •     NGƯỜI THẮNG: ${winners}</text><text x="80" y="520" class="stat">TỔNG TIỀN CƯỢC: ${escapeSvg(formatVnd(totalBet))}</text><text x="55" y="570" class="sub">DANH SÁCH KẾT QUẢ</text>${rows}${extra}</svg>`;
+  const rows = entries.slice(0, maxRows).map((e, i) => `<g><rect x="55" y="${rowsY + i * 55}" width="790" height="43" rx="12" fill="${e.win ? '#173f35' : '#40252d'}"/><text x="78" y="${rowsY + 30 + i * 55}" class="row">${e.win ? 'THẮNG' : 'THUA'}  •  ...${escapeSvg(e.uid.slice(-6))}  •  ${escapeSvg(e.choice.toUpperCase())}  •  ${e.win ? '+' : '-'}${escapeSvg(formatVnd(e.win ? e.payout : e.amount))}</text></g>`).join('');
+  const extra = entries.length > maxRows ? `<text x="450" y="${rowsY + 25 + maxRows * 55}" class="small" text-anchor="middle">...và ${entries.length - maxRows} người chơi khác</text>` : '';
+  const height = rowsY + 85 + Math.min(entries.length, maxRows) * 55;
+  const svg = `<svg width="900" height="${height}" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#25132f"/><stop offset="1" stop-color="#101b2d"/></linearGradient></defs><style>.title{font:700 44px sans-serif;fill:#fff}.sub{font:700 27px sans-serif;fill:#ffe17b}.face{font:800 25px sans-serif;fill:#32151a}.box{font:800 21px sans-serif;fill:#fff}.die{font:800 82px sans-serif;fill:#b71c35}.lotto{font:800 92px sans-serif;fill:#d51f3d}.stat{font:700 24px sans-serif;fill:#fff}.row{font:700 20px sans-serif;fill:#fff}.small{font:20px sans-serif;fill:#cdd7e8}</style><rect width="900" height="${height}" rx="34" fill="url(#bg)"/><rect x="18" y="18" width="864" height="${height - 36}" rx="28" fill="none" stroke="#e5ad32" stroke-width="5"/><text x="450" y="82" class="title" text-anchor="middle">KẾT QUẢ PHIÊN ${escapeSvg(roundLabel(game))}</text><text x="450" y="132" class="sub" text-anchor="middle">#${escapeSvg(id.toUpperCase())}</text><text x="450" y="178" class="sub" text-anchor="middle">${escapeSvg(resultTitle)}</text>${resultBoxes}<rect x="55" y="${statsY}" width="790" height="115" rx="22" fill="#ffffff" opacity=".09"/><text x="80" y="${statsY + 44}" class="stat">NGƯỜI CHƠI: ${totalPlayers}     •     NGƯỜI THẮNG: ${winners}</text><text x="80" y="${statsY + 90}" class="stat">TỔNG TIỀN CƯỢC: ${escapeSvg(formatVnd(totalBet))}</text><text x="55" y="${listTitleY}" class="sub">DANH SÁCH KẾT QUẢ</text>${rows}${extra}</svg>`;
   await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(out);
   return out;
 }
@@ -424,7 +439,8 @@ function openMultiplayerRound(game, api, threadID) {
   sendRoundMessage(api, threadID,
     `╭── 🎮 ${roundLabel(game)} NHIỀU NGƯỜI ──╮\n` +
     `│ ⏳ Mở cược trong 45 giây\n│ 📝 ${examples}\n` +
-    `│ 🔄 Mỗi người được đổi cửa trước khi khóa cược\n╰────────────────────╯`);
+    `│ 🔄 Mỗi người được đổi cửa trước khi khóa cược\n╰────────────────────╯`,
+    game === 'baucua');
   return true;
 }
 
@@ -610,14 +626,18 @@ function handleCommand(api, event) {
       if (!openMultiplayerRound(game, api, threadID)) {
         const r = multiplayerRounds[game][threadID];
         const left = Math.max(1, Math.ceil((r.closesAt - Date.now()) / 1000));
-        reply(`⚠️ Đã có vòng ${roundLabel(game)} đang mở. Còn ${left} giây, ${r.bets.size} người đã cược.`);
+        if (game === 'baucua') sendRoundMessage(api, threadID, `⚠️ Đã có vòng ${roundLabel(game)} đang mở. Còn ${left} giây, ${r.bets.size} người đã cược.`, true);
+        else reply(`⚠️ Đã có vòng ${roundLabel(game)} đang mở. Còn ${left} giây, ${r.bets.size} người đã cược.`);
       }
       return;
     }
     if (lower === `!${game}`) {
       const r = multiplayerRounds[game][threadID];
-      if (!r) reply(`🎮 Gõ !${game} start để mở vòng cược chung 45 giây.`);
-      else reply(`⏳ Vòng ${roundLabel(game)} còn ${Math.max(1, Math.ceil((r.closesAt - Date.now()) / 1000))} giây — ${r.bets.size} người đã cược.`);
+      const status = !r
+        ? `🎮 Gõ !${game} start để mở vòng cược chung 45 giây.`
+        : `⏳ Vòng ${roundLabel(game)} còn ${Math.max(1, Math.ceil((r.closesAt - Date.now()) / 1000))} giây — ${r.bets.size} người đã cược.`;
+      if (game === 'baucua') sendRoundMessage(api, threadID, status, true);
+      else reply(status);
       return;
     }
     if (lower.startsWith(`!${game} `)) {

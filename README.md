@@ -232,3 +232,9 @@ Các tin do bot gửi cho vòng cược nhiều người (mở phiên, GIF quay/
 ### Tương thích tag người dùng của Orion FCA
 
 Các lệnh `!kick`, `!setbd`, `!ban`, `!mute`, `!warn`, `!give`, `!reset`, `!addadmin`, `!deladmin` và `!bank` nhận được cả hai kiểu dữ liệu mention (array và object). Thứ tự tham số `removeUserFromGroup(userID, threadID)` cũng đã được sửa đúng.
+
+### Bầu Cua giao diện kiểu Discord (bản thiết kế lại)
+
+- GIF xóc mới hiển thị ba quân riêng biệt quay/lật, thay vì rung cả bàn.
+- Ảnh kết quả dùng trực tiếp hình linh vật Bầu/Cua/Tôm/Cá/Gà/Nai, bố cục một quân lớn và hai quân bên phải giống mẫu Discord.
+- Các tin chính gồm hướng dẫn/trạng thái, mở phiên và kết quả Bầu Cua đều đính kèm ảnh bàn tĩnh; xác nhận từng cược và lỗi nhỏ chỉ dùng chữ để tránh spam ảnh.
