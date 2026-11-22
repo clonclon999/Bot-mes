@@ -383,14 +383,20 @@ function settleMultiplayerRound(game, threadID) {
   const round = multiplayerRounds[game][threadID];
   if (!round) return;
 
-  // Messenger hỗ trợ GIF: phát hiệu ứng xóc trước, sau đó mới công bố kết quả.
-  if (game === 'baucua' && !round.animationPlayed && round.bets.size > 0) {
+  // Messenger hỗ trợ GIF: phát hiệu ứng trước, sau đó mới công bố kết quả.
+  if (!round.animationPlayed && round.bets.size > 0) {
     round.animationPlayed = true;
     clearTimeout(round.timer);
-    const gif = path.join(__dirname, 'baucua_roll.gif');
-    const loading = { body: '🎲 ĐANG XÓC BẦU CUA... Kết quả sắp có!', noAck: true };
-    if (fs.existsSync(gif)) loading.attachment = fs.createReadStream(gif);
-    round.api.sendMessage(loading, threadID, err => err && console.error('❌ Lỗi gửi GIF Bầu Cua:', err.message || err));
+    const animations = {
+      taixiu: ['taixiu_roll.gif', '🎲 ĐANG LẮC XÚC XẮC...'],
+      baucua: ['baucua_roll.gif', '🦀 ĐANG XÓC BẦU CUA...'],
+      lotto: ['lotto_draw.gif', '🎱 ĐANG QUAY LOTTO...'],
+    };
+    const [file, title] = animations[game] || [];
+    const gif = file && path.join(__dirname, file);
+    const loading = { body: `${title || '🎮 ĐANG QUAY...'} Kết quả sắp có!`, noAck: true };
+    if (gif && fs.existsSync(gif)) loading.attachment = fs.createReadStream(gif);
+    round.api.sendMessage(loading, threadID, err => err && console.error('❌ Lỗi gửi GIF trò chơi:', err.message || err));
     round.timer = setTimeout(() => settleMultiplayerRound(game, threadID), 2600);
     return;
   }
@@ -776,10 +782,10 @@ function handleCommand(api, event) {
     let payout = 0, msg = `🎰 QUAY XÈNG\n${spin.join(' | ')}\nCược: ${formatVnd(bet)}\n`;
     if (spin[0] === spin[1] && spin[1] === spin[2]) {
       payout = bet * 10;
-      msg += `🎉 JACKPOT 3 GIONG NHAU! Nhận ${formatVnd(payout)}`;
+      msg += `🎉 JACKPOT 3 GIỐNG NHAU! Nhận ${formatVnd(payout)}`;
     } else if (spin[0] === spin[1] || spin[1] === spin[2] || spin[0] === spin[2]) {
       payout = bet * 2;
-      msg += `😊 Trúng 2 o! Nhận ${formatVnd(payout)}`;
+      msg += `😊 Trúng 2 ô! Nhận ${formatVnd(payout)}`;
     } else {
       msg += `😢 Không trúng. Mất ${formatVnd(bet)}`;
     }
@@ -790,7 +796,11 @@ function handleCommand(api, event) {
     if (payout > 0) qmsg3 += addQuestProgress(u, 'win', 1);
     saveData();
     msg += `\n💰 Số dư: ${formatVnd(u.balance)}`;
-    reply(msg);
+    const slotGif = path.join(__dirname, 'slot_spin.gif');
+    const loading = { body: '🎰 ĐANG QUAY XÈNG... May mắn đang đến!', noAck: true };
+    if (fs.existsSync(slotGif)) loading.attachment = fs.createReadStream(slotGif);
+    api.sendMessage(loading, threadID, err => err && console.error('❌ Lỗi gửi GIF Slot:', err.message || err));
+    setTimeout(() => reply(msg), 2300);
     return;
   }
 

@@ -204,3 +204,12 @@ Mỗi người có một vé cược mỗi vòng và có thể đổi cửa/ti�
 ### Hiệu ứng Bầu Cua trên Messenger
 
 Khi vòng Bầu Cua 45 giây khóa cược, bot gửi `baucua_roll.gif` (hiệu ứng rung/xóc khoảng 2,6 giây), sau đó mới gửi ảnh bàn cùng kết quả chung và danh sách thắng/thua. Messenger hỗ trợ phát GIF nhưng không hỗ trợ Discord Embed/Button/animation component, nên đây là hiệu ứng ảnh động gửi trong chat.
+
+### Bộ hiệu ứng game nhẹ
+
+- `taixiu_roll.gif`: lắc 3 xúc xắc trước kết quả vòng chung.
+- `baucua_roll.gif`: xóc/rung bàn Bầu Cua trước kết quả.
+- `lotto_draw.gif`: quay lồng cầu số trước kết quả Lotto.
+- `slot_spin.gif`: ba ô quay trước kết quả Slot cá nhân.
+
+GIF chỉ gửi một lần ở thời điểm công bố/quay để tránh spam nhóm và giảm nguy cơ Facebook giới hạn tài khoản. Các game không cần hình vẫn dùng khung Unicode nhẹ.
